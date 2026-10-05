@@ -326,7 +326,71 @@
     ctx.restore();
   }
 
+  var tick = 0;
+
+  // one ice diamond, used for the braids
+  function iceDiamond(px, py, s) {
+    ctx.beginPath();
+    ctx.moveTo(px, py - s); ctx.lineTo(px + s * 0.7, py);
+    ctx.lineTo(px, py + s); ctx.lineTo(px - s * 0.7, py);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  }
+
+  // The ice unicorn: white-blue body, a purple horn, and long ice braids that swing as she slides
+  function drawIceUnicorn(x, y, vx, vy) {
+    var speed = Math.sqrt(vx * vx + vy * vy);
+    var trot = Math.sin(tick / 4) * Math.min(speed, 4) * 1.6;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.lineJoin = 'round';
+
+    // long ice braids behind the head (drawn first so they sit behind her)
+    ctx.fillStyle = '#c9f0ff'; ctx.strokeStyle = '#4aa6dd'; ctx.lineWidth = 1.5;
+    for (var b = 0; b < 3; b++) {
+      for (var j = 1; j <= 7; j++) {
+        var bx = 8 - j * 6.5 - vx * j * 1.4;
+        var by = -12 + b * 6 + j * 1.2 + Math.sin(tick / 9 + j * 0.7 + b) * 2 - vy * j * 1.4;
+        iceDiamond(bx, by, 4.2 - j * 0.25);
+      }
+    }
+
+    // tail: icy swoosh
+    ctx.strokeStyle = '#8fd3f4'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-17, 2);
+    ctx.quadraticCurveTo(-30 - vx * 2, 6 + Math.sin(tick / 8) * 3 - vy * 2, -34 - vx * 3, 14 - vy * 3);
+    ctx.stroke();
+
+    // legs
+    ctx.strokeStyle = '#dff4ff'; ctx.lineWidth = 5;
+    [[-10, 1], [-5, -1], [8, -1], [13, 1]].forEach(function (l) {
+      ctx.beginPath(); ctx.moveTo(l[0], 8);
+      ctx.lineTo(l[0] + trot * l[1], 19); ctx.stroke();
+    });
+
+    // body
+    ctx.fillStyle = '#f2fbff'; ctx.strokeStyle = '#8fd3f4'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, 3, 18, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // neck and head
+    ctx.beginPath(); ctx.ellipse(13, -5, 7, 10, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(21, -11, 9, 6.5, 0.25, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // ear, eye, cheek
+    ctx.beginPath(); ctx.moveTo(14, -16); ctx.lineTo(16, -23); ctx.lineTo(19, -16); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#1b2a4a'; ctx.beginPath(); ctx.arc(23, -12, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,143,199,.7)'; ctx.beginPath(); ctx.arc(20, -8, 2.4, 0, Math.PI * 2); ctx.fill();
+
+    // horn
+    ctx.fillStyle = '#b79cff'; ctx.strokeStyle = '#7f5fe0'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(22, -16); ctx.lineTo(33, -30); ctx.lineTo(26, -14); ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.restore();
+  }
+
   function draw() {
+    tick++;
     // lake
     var g = ctx.createLinearGradient(0, 0, W, 0);
     g.addColorStop(0, '#c9ecff'); g.addColorStop(1, '#8fd3f4');
@@ -359,8 +423,7 @@
     // unicorn (blinks while safe after a hit)
     var blink = invulnerable > 0 && Math.floor(invulnerable / 6) % 2 === 0;
     if (!blink) {
-      ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('🦄', uni.x, uni.y);
+      drawIceUnicorn(uni.x, uni.y, uni.vx, uni.vy);
     }
 
     // red flash when hit
