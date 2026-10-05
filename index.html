@@ -124,6 +124,9 @@
     <h2>Pick your unicorn</h2>
     <canvas id="preview" width="240" height="140"></canvas>
     <div class="picker" id="picker"></div>
+    <p style="font-weight:700">How hard?</p>
+    <div class="picker" id="diffPicker"></div>
+    <p id="diffDesc"></p>
     <input type="text" id="nameInput" maxlength="14" value="Glacier" aria-label="Unicorn name">
     <button id="startBtn">Start the race</button>
     <button id="shopBtn" class="secondary">🛍️ Shop</button>
@@ -711,10 +714,10 @@
       { name: 'Spark circle',   layout: 'orbit',   hazard: 'bolt', tip: 'Dodge the spinning sparks!' }
     ],
     weather: [
-      { name: 'Tornado flight', layout: 'columns', hazard: 'branch', wind: 0.11, tip: 'The wind pushes you! Dodge the branches!' },
+      { name: 'Tornado flight', layout: 'columns', hazard: 'branch', wind: true, tip: 'The wind pushes you! Dodge the branches!' },
       { name: 'Branch shower',  layout: 'rain',    hazard: 'branch',             tip: 'Dodge the falling branches!' },
-      { name: 'Wind gates',     layout: 'walls',                     wind: 0.11, tip: 'The wind pushes you! Find the gap!' },
-      { name: 'Twister spin',   layout: 'orbit',   hazard: 'branch', wind: 0.11, tip: 'The wind pushes you! Dodge the spinning branches!' }
+      { name: 'Wind gates',     layout: 'walls',                     wind: true, tip: 'The wind pushes you! Find the gap!' },
+      { name: 'Twister spin',   layout: 'orbit',   hazard: 'branch', wind: true, tip: 'The wind pushes you! Dodge the spinning branches!' }
     ]
   };
   var WALLS = {
@@ -725,6 +728,28 @@
     weather: { fill: '#9a6a3a', edge: '#5c3a1b' }
   };
   var raceVariants = [];
+
+  // three difficulty tiers (pick one on the start screen)
+  //   easy   = the gentler settings she asked for
+  //   medium = the game's original settings
+  //   hard   = more dangers, faster dangers, bigger hit areas, narrower gaps, stronger wind
+  var DIFFS = {
+    easy:   { label: '🌱 Easy',   desc: 'Fewer, slower dangers and wide gaps.',
+              hit: 0.7,  cols: [4, 5, 6], bounce: [1.0, 1.8], fall: [1.3, 2.2], rain: [5, 6, 8],  rainSpd: [2.0, 3.2],
+              orbit: [2, 3, 3], orbR: [44, 54], orbW: [0.025, 0.037], walls: [2, 3, 3], gapH: 150, wallSp: [0.016, 0.028], wallAmp: [70, 115],
+              wind: 0.11, iceF: 0.92 },
+    medium: { label: '🌟 Medium', desc: 'More dangers, moving faster.',
+              hit: 0.8,  cols: [5, 6, 7], bounce: [1.2, 2.2], fall: [1.5, 2.6], rain: [6, 8, 10], rainSpd: [2.4, 3.8],
+              orbit: [3, 3, 4], orbR: [48, 60], orbW: [0.03, 0.045],  walls: [3, 4, 4], gapH: 130, wallSp: [0.02, 0.034],  wallAmp: [80, 125],
+              wind: 0.16, iceF: 0.94 },
+    hard:   { label: '🔥 Hard',   desc: 'Lots of fast dangers and narrow gaps. Good luck!',
+              hit: 0.88, cols: [6, 7, 8], bounce: [1.7, 2.9], fall: [2.0, 3.3], rain: [8, 10, 12], rainSpd: [2.9, 4.5],
+              orbit: [3, 4, 4], orbR: [52, 66], orbW: [0.04, 0.056],  walls: [3, 4, 5], gapH: 112, wallSp: [0.026, 0.038], wallAmp: [90, 128],
+              wind: 0.21, iceF: 0.95 }
+  };
+  var difficulty = lsGet('unicornRace.difficulty');
+  if (!DIFFS[difficulty]) difficulty = 'easy';
+  function D() { return DIFFS[difficulty]; }
   var keys = { left: false, right: false, up: false, down: false };
 
   function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -734,21 +759,21 @@
   function buildHazards(v, gi) {
     var list = [], k, x, r;
     if (v.layout === 'walls') {
-      var n = [2, 3, 3][gi], step = (700 - 200) / (n - 1), gapH = 150;
+      var n = D().walls[gi], step = (700 - 200) / (n - 1), gapH = D().gapH;
       for (k = 0; k < n; k++) {
         list.push({ kind: 'wall', x: 200 + k * step, y: 250, r: 0, w: 34, gapH: gapH, vy: 0, mode: 'wall',
-                    ph: Math.random() * 6, sp: rnd(0.016, 0.028) * (Math.random() < 0.5 ? -1 : 1), amp: rnd(70, 115) });
+                    ph: Math.random() * 6, sp: rnd(D().wallSp[0], D().wallSp[1]) * (Math.random() < 0.5 ? -1 : 1), amp: rnd(D().wallAmp[0], D().wallAmp[1]) });
       }
     } else if (v.layout === 'rain') {
-      var cnt = [5, 6, 8][gi];
+      var cnt = D().rain[gi];
       for (k = 0; k < cnt; k++) {
         var h = mkHaz(rnd(170, 700), rnd(LAKE.top - 320, LAKE.bottom - 40), rnd(22, 30));
-        h.mode = 'rain'; h.vy = rnd(2.0, 3.2); list.push(h);
+        h.mode = 'rain'; h.vy = rnd(D().rainSpd[0], D().rainSpd[1]); list.push(h);
       }
     } else if (v.layout === 'orbit') {
-      var oc = [2, 3, 3][gi], ostep = (700 - 190) / (oc - 1);
+      var oc = D().orbit[gi], ostep = (700 - 190) / (oc - 1);
       for (k = 0; k < oc; k++) {
-        var R = rnd(44, 54), cy = rnd(LAKE.top + R + 30, LAKE.bottom - R - 30), a0 = Math.random() * 6, w = rnd(0.025, 0.037) * (Math.random() < 0.5 ? -1 : 1);
+        var R = rnd(D().orbR[0], D().orbR[1]), cy = rnd(LAKE.top + R + 30, LAKE.bottom - R - 30), a0 = Math.random() * 6, w = rnd(D().orbW[0], D().orbW[1]) * (Math.random() < 0.5 ? -1 : 1);
         for (var q = 0; q < 2; q++) {
           var ho = mkHaz(190 + k * ostep, cy, rnd(22, 26));
           ho.mode = 'orbit'; ho.cx = 190 + k * ostep; ho.cy = cy; ho.R = R; ho.ang = a0 + q * Math.PI; ho.w = w;
@@ -757,7 +782,7 @@
         }
       }
     } else {
-      var cn = [4, 5, 6][gi], cstep = (700 - 170) / (cn - 1);
+      var cn = D().cols[gi], cstep = (700 - 170) / (cn - 1);
       for (k = 0; k < cn; k++) {
         x = 170 + k * cstep; r = rnd(28, 36);
         var roll = Math.random();
@@ -767,9 +792,9 @@
         } else if (roll < 0.6) {
           list.push(mkHaz(x, rnd(LAKE.top + r, LAKE.bottom - r), r));
         } else if (v.fall) {
-          var hf = mkHaz(x, rnd(LAKE.top, LAKE.bottom), r); hf.mode = 'fall'; hf.vy = rnd(1.3, 2.2); list.push(hf);
+          var hf = mkHaz(x, rnd(LAKE.top, LAKE.bottom), r); hf.mode = 'fall'; hf.vy = rnd(D().fall[0], D().fall[1]); list.push(hf);
         } else {
-          var hb = mkHaz(x, rnd(LAKE.top + r, LAKE.bottom - r), r); hb.mode = 'bounce'; hb.vy = (Math.random() < 0.5 ? -1 : 1) * rnd(1.0, 1.8); list.push(hb);
+          var hb = mkHaz(x, rnd(LAKE.top + r, LAKE.bottom - r), r); hb.mode = 'bounce'; hb.vy = (Math.random() < 0.5 ? -1 : 1) * rnd(D().bounce[0], D().bounce[1]); list.push(hb);
         }
       }
     }
@@ -842,7 +867,7 @@
         if (h.y - h.r > LAKE.bottom) h.y = LAKE.top - h.r;
       } else if (h.mode === 'rain') {
         h.y += h.vy;
-        if (h.y - h.r > LAKE.bottom) { h.y = LAKE.top - h.r - rnd(0, 120); h.x = rnd(170, 700); h.vy = rnd(2.0, 3.2); }
+        if (h.y - h.r > LAKE.bottom) { h.y = LAKE.top - h.r - rnd(0, 120); h.x = rnd(170, 700); h.vy = rnd(D().rainSpd[0], D().rainSpd[1]); }
       } else if (h.mode === 'orbit') {
         h.ang += h.w; h.x = h.cx + Math.cos(h.ang) * h.R; h.y = h.cy + Math.sin(h.ang) * h.R;
       } else if (h.mode === 'wall') {
@@ -864,8 +889,8 @@
     var ax = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
     var ay = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
     u.vx += ax * 0.5; u.vy += ay * 0.5;
-    if (ch.v.wind) u.vy += Math.sin(ch.age / 45) * ch.v.wind;   // the wind pushes up and down
-    var fr = ch.v.friction || I.friction;
+    if (ch.v.wind) u.vy += Math.sin(ch.age / 45) * D().wind;   // the wind pushes up and down
+    var fr = ch.v.friction || (selected === 'ice' ? D().iceF : I.friction);
     u.vx *= fr; u.vy *= fr;
     var sp = Math.sqrt(u.vx * u.vx + u.vy * u.vy);
     if (sp > 5) { u.vx = u.vx / sp * 5; u.vy = u.vy / sp * 5; }
@@ -880,7 +905,7 @@
         // the danger is a little smaller than it looks, so it feels fair
         if (h.kind === 'wall') {
           if (Math.abs(dx) < h.w / 2 + u.r * 0.6 && (u.y - u.r * 0.6 < h.y - h.gapH / 2 || u.y + u.r * 0.6 > h.y + h.gapH / 2)) { loseLife(); return; }
-        } else if (Math.sqrt(dx * dx + dy * dy) < h.r * 0.7 + u.r * 0.6) { loseLife(); return; }
+        } else if (Math.sqrt(dx * dx + dy * dy) < h.r * D().hit + u.r * 0.6) { loseLife(); return; }
       }
     }
     if (u.x >= GOAL_X) winChallenge();
@@ -1203,7 +1228,7 @@
     if (place <= 2) b.podium++;
     b.bestPlace = Math.min(b.bestPlace || 5, place);
     if (time != null && (!b.fastest || time < b.fastest.time)) { b.fastest = { time: time, el: selected, name: unicornName }; newFastest = true; }
-    b.history.unshift({ place: place, el: selected, name: unicornName, time: time });
+    b.history.unshift({ place: place, el: selected, name: unicornName, time: time, d: difficulty });
     b.history = b.history.slice(0, 8);
     lsSet('unicornRace.board', JSON.stringify(b));
     return { fastest: newFastest };
@@ -1265,6 +1290,19 @@
     });
     picker.appendChild(b);
   });
+
+  var diffPicker = document.getElementById('diffPicker');
+  function paintDiff() {
+    Array.prototype.forEach.call(diffPicker.children, function (c) { c.classList.toggle('sel', c.getAttribute('data-d') === difficulty); });
+    document.getElementById('diffDesc').textContent = D().desc;
+  }
+  ['easy', 'medium', 'hard'].forEach(function (k) {
+    var b = document.createElement('button');
+    b.className = 'pick'; b.setAttribute('data-d', k); b.textContent = DIFFS[k].label;
+    b.addEventListener('click', function () { difficulty = k; lsSet('unicornRace.difficulty', k); paintDiff(); });
+    diffPicker.appendChild(b);
+  });
+  paintDiff();
 
   document.getElementById('startBtn').addEventListener('click', function () {
     theme = THEMES[selected];
@@ -1464,7 +1502,7 @@
     if (b.history.length) {
       line('Last races:', true);
       b.history.forEach(function (h) {
-        line(ordinal(h.place) + ' place: ' + INFO[h.el].emoji + ' ' + h.name + (h.time ? ', ' + h.time.toFixed(1) + ' seconds' : ', sat out'));
+        line(ordinal(h.place) + ' place: ' + INFO[h.el].emoji + ' ' + h.name + (h.time ? ', ' + h.time.toFixed(1) + ' seconds' : ', sat out') + (h.d ? ', ' + h.d : ''));
       });
     }
     show('boardScreen');
