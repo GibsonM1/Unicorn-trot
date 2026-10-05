@@ -164,7 +164,7 @@
       <div class="picker" id="shopPicker"></div>
       <canvas id="shopCanvas" width="400" height="240" aria-label="Tap a part of your unicorn to color it"></canvas>
       <div class="swatches" id="swatches"></div>
-      <p id="colorMsg">1. Pick a color. 2. Tap the horn, mane, body, or tail.</p>
+      <p id="colorMsg">1. Pick a color. 2. Tap the horn, mane, body, tail, or mark.</p>
       <button id="resetColorsBtn" class="secondary small">Back to original colors (free)</button>
     </div>
     <div class="shopBox">
@@ -508,12 +508,40 @@
     // near legs
     leg(-13, -trot, false); leg(10, trot, false);
 
-    // the weather unicorn wears a lightning bolt on her side
-    if (el === 'weather') {
-      c.fillStyle = '#ffd23d'; c.strokeStyle = '#e09f00'; c.lineWidth = 1;
-      c.beginPath(); c.moveTo(1, -5); c.lineTo(-5, 2); c.lineTo(-2, 2); c.lineTo(-4, 7); c.lineTo(3, 0); c.lineTo(0, 0);
+    // her special mark on her side
+    c.save(); c.translate(-1, -0.5); c.lineCap = 'round'; c.lineJoin = 'round';
+    if (el === 'ice') {
+      c.strokeStyle = C.mark || '#4aa6dd'; c.lineWidth = 1.7;
+      for (var sa = 0; sa < 3; sa++) {
+        c.save(); c.rotate(sa * Math.PI / 3);
+        c.beginPath(); c.moveTo(-6, 0); c.lineTo(6, 0);
+        c.moveTo(3.4, 0); c.lineTo(5, 1.8); c.moveTo(3.4, 0); c.lineTo(5, -1.8);
+        c.moveTo(-3.4, 0); c.lineTo(-5, 1.8); c.moveTo(-3.4, 0); c.lineTo(-5, -1.8);
+        c.stroke(); c.restore();
+      }
+    } else if (el === 'water') {
+      c.fillStyle = C.mark || '#3a9be0'; c.strokeStyle = 'rgba(27,42,74,.35)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(0, -6.5); c.bezierCurveTo(4.5, -1, 5.5, 2, 0, 5.5); c.bezierCurveTo(-5.5, 2, -4.5, -1, 0, -6.5);
+      c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.ellipse(-1.6, 0.5, 1, 1.9, 0.3, 0, Math.PI * 2); c.fill();
+    } else if (el === 'fire') {
+      c.fillStyle = C.mark || '#ff7a33'; c.strokeStyle = 'rgba(27,42,74,.3)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(0, -7.5); c.quadraticCurveTo(-5.5, -1, -3.8, 3); c.quadraticCurveTo(0, 6.5, 3.8, 3); c.quadraticCurveTo(5.5, -1, 0, -7.5);
+      c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#ffcf3d'; c.beginPath(); c.moveTo(0, -2); c.quadraticCurveTo(-2.6, 1, -1.6, 3); c.quadraticCurveTo(0, 4.6, 1.6, 3); c.quadraticCurveTo(2.6, 1, 0, -2);
+      c.closePath(); c.fill();
+    } else if (el === 'plant') {
+      c.save(); c.rotate(-0.6);
+      c.fillStyle = C.mark || '#4caf50'; c.strokeStyle = '#2f8a3a'; c.lineWidth = 1.2;
+      c.beginPath(); c.ellipse(0, 0, 7, 3.6, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+      c.strokeStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.moveTo(-6, 0); c.lineTo(5.5, 0); c.stroke();
+      c.restore();
+    } else {
+      c.fillStyle = C.mark || '#ffd23d'; c.strokeStyle = '#e09f00'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(2, -6.5); c.lineTo(-3.5, 1); c.lineTo(0, 1); c.lineTo(-2, 6.5); c.lineTo(4, -1.5); c.lineTo(1, -1.5);
       c.closePath(); c.fill(); c.stroke();
     }
+    c.restore();
 
     // flowing mane down her neck, and a little forelock
     MANE_A.forEach(function (a, i) {
@@ -1282,7 +1310,7 @@
     if (!INFO[shopEl]) shopEl = selected;
     chosenColor = null;
     Array.prototype.forEach.call(document.getElementById('swatches').children, function (b) { b.classList.remove('sel'); });
-    setColorMsg('1. Pick a color. 2. Tap the horn, mane, body, or tail.');
+    setColorMsg('1. Pick a color. 2. Tap the horn, mane, body, tail, or mark.');
     refreshShop(); show('shopScreen'); shopOpen = true;
   }
 
@@ -1300,7 +1328,7 @@
       chosenColor = col;
       Array.prototype.forEach.call(document.getElementById('swatches').children, function (x) { x.classList.remove('sel'); });
       b.classList.add('sel');
-      setColorMsg('Now tap the horn, mane, body, or tail!');
+      setColorMsg('Now tap the horn, mane, body, tail, or mark!');
     });
     document.getElementById('swatches').appendChild(b);
   });
@@ -1324,6 +1352,7 @@
     }
     tip = lockTip(FORE_A[0], FORE_A[1], FORE_A[2], 0.5, -1, 0, 0, 0);
     if (distSeg(x, y, FORE_A[0], FORE_A[1], tip.x, tip.y) < FORE_A[3] + 3) return 'mane';
+    if (Math.sqrt((x + 1) * (x + 1) + (y + 0.5) * (y + 0.5)) < 7.5) return 'mark';
     if (inE(x, y, 0, 0, 20, 9.5) || inE(x, y, 15, -16, 8.5, 14) || inE(x, y, 29, -25, 11, 8) ||
         (x > 19 && x < 26 && y > -41 && y < -31) || (y > 4 && y < 24 && ((x > -17 && x < -5) || (x > 5 && x < 19)))) return 'body';
     for (i = 0; i < TAIL_A.length; i++) {
@@ -1338,7 +1367,7 @@
     var cx = (e.clientX - r.left) * (shopCanvas.width / r.width), cy = (e.clientY - r.top) * (shopCanvas.height / r.height);
     var part = partAt((cx - SHOP_X) / SHOP_SC, (cy - SHOP_Y) / SHOP_SC);
     if (!chosenColor) { setColorMsg('Pick a color first!'); return; }
-    if (!part) { setColorMsg('Tap the unicorn: horn, mane, body, tail, or ribbon.'); return; }
+    if (!part) { setColorMsg('Tap the unicorn: horn, mane, body, tail, mark, or ribbon.'); return; }
     if (gems < COLOR_COST) { setColorMsg('You need ' + COLOR_COST + ' 💎 to change a color.'); return; }
     gems -= COLOR_COST; lsSet('unicornRace.gems', gems);
     colors[shopEl] = colors[shopEl] || {}; colors[shopEl][part] = chosenColor; saveColors();
