@@ -1085,131 +1085,62 @@
     ctx.restore();
   }
 
-  // ---------- the meadow (drawn once, then reused) ----------
-  function rng(seed) { return function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
-
-  function drawTree(g, x, y, sc, shade, pine) {      // (x, y) is the bottom of the trunk
-    g.fillStyle = '#7a5230'; g.fillRect(x - 3 * sc, y - 14 * sc, 6 * sc, 16 * sc);
-    if (pine) {
-      g.fillStyle = shade === 0 ? '#1f7a45' : '#2a8c50';
-      [[-22, 14], [-33, 11], [-43, 8]].forEach(function (t) {
-        g.beginPath(); g.moveTo(x - t[1] * sc * 1.2, y + (t[0] + 14) * sc); g.lineTo(x, y + (t[0] - 10) * sc); g.lineTo(x + t[1] * sc * 1.2, y + (t[0] + 14) * sc); g.closePath(); g.fill();
-      });
-      return;
-    }
-    var greens = ['#2f8f46', '#3aa655', '#4cba63'];
-    [[0, -26, 15], [-11, -18, 11], [11, -18, 11], [0, -37, 11], [-7, -30, 9], [8, -29, 9]].forEach(function (b, i) {
-      g.fillStyle = greens[(i + shade) % 3]; g.beginPath(); g.arc(x + b[0] * sc, y + b[1] * sc, b[2] * sc, 0, Math.PI * 2); g.fill();
-    });
-    g.fillStyle = 'rgba(255,255,255,.14)'; g.beginPath(); g.arc(x - 4 * sc, y - 31 * sc, 6 * sc, 0, Math.PI * 2); g.fill();
-  }
-
-  function rr(g, x, y, w, h, r) {
-    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
-    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
-  }
-
-  function drawMeadow(g) {
-    var rand = rng(11), i, x;
-    // sky, sun, clouds, far hills
-    var sg = g.createLinearGradient(0, 0, 0, 120); sg.addColorStop(0, '#8fd0ff'); sg.addColorStop(1, '#e4f6ff');
-    g.fillStyle = sg; g.fillRect(0, 0, W, 130);
-    g.fillStyle = '#fff3a8'; g.beginPath(); g.arc(715, 30, 20, 0, Math.PI * 2); g.fill();
-    g.fillStyle = 'rgba(255,255,255,.95)';
-    [[110, 26], [290, 16], [500, 30], [620, 14]].forEach(function (cl) {
-      [[0, 0, 13], [14, 3, 10], [-14, 4, 9], [26, 6, 7]].forEach(function (p) { g.beginPath(); g.arc(cl[0] + p[0], cl[1] + p[1], p[2], 0, Math.PI * 2); g.fill(); });
-    });
-    g.fillStyle = '#a9dc9a'; g.beginPath(); g.ellipse(170, 84, 270, 42, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#92d088'; g.beginPath(); g.ellipse(620, 88, 320, 46, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#7ac962'; g.fillRect(0, 62, W, H - 62);
-
-    // two rows of trees along the top, and little trees at the bottom
-    for (x = -8; x < W + 30; x += 30 + rand() * 14) drawTree(g, x, 50 + rand() * 6, 0.5 + rand() * 0.25, Math.floor(rand() * 3), rand() < 0.3);
-    for (x = 6; x < W + 30; x += 44 + rand() * 20) drawTree(g, x, 66, 0.82 + rand() * 0.3, Math.floor(rand() * 3), rand() < 0.3);
-    g.fillStyle = '#68b556'; g.fillRect(0, LANE_Y0 + 5 * LANE_H, W, H - (LANE_Y0 + 5 * LANE_H));
-    for (x = 8; x < W + 30; x += 38 + rand() * 18) drawTree(g, x, 488 + rand() * 6, 0.5 + rand() * 0.18, Math.floor(rand() * 3), rand() < 0.3);
-
-    // the five lanes: mowed grass with a colored start pad and wooden challenge gates
-    for (i = 0; i < 5; i++) {
-      var el = ELEMENTS[i], I = INFO[el], y0 = LANE_Y0 + i * LANE_H, ly = y0 + 6, lh = LANE_H - 12;
-      g.fillStyle = i % 2 ? '#9adf7a' : '#a6e585'; g.fillRect(40, ly, W - 80, lh);
-      g.fillStyle = 'rgba(255,255,255,.08)';
-      for (x = 40; x < W - 40; x += 60) g.fillRect(x, ly, 30, lh);
-      g.fillStyle = I.lane; g.globalAlpha = 0.75; g.fillRect(40, ly, TX0 - 62, lh); g.globalAlpha = 1;
-      g.font = '22px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1b2a4a';
-      g.fillText(I.emoji, 22, y0 + LANE_H / 2);
-      g.fillText(I.emoji, 40 + (TX0 - 62) / 2, y0 + LANE_H / 2);
-      for (var f = 0; f < 7; f++) {                                  // tiny flowers
-        g.fillStyle = ['#ff8fc7', '#ffe14d', '#ffffff', '#c9a7ff'][Math.floor(rand() * 4)];
-        g.beginPath(); g.arc(TX0 + rand() * (TX1 - TX0), ly + 6 + rand() * (lh - 12), 2, 0, Math.PI * 2); g.fill();
-      }
-      GATES.forEach(function (gt) {
-        var gx = TX0 + (TX1 - TX0) * gt;
-        g.fillStyle = '#8a5a2b'; g.fillRect(gx - 9, ly + 4, 4, lh - 8); g.fillRect(gx + 5, ly + 4, 4, lh - 8);
-        g.fillStyle = '#ffd23d'; g.fillRect(gx - 9, ly + 4, 18, 4);
-        g.font = '14px serif'; g.fillStyle = '#1b2a4a'; g.fillText('⚠️', gx, ly + 16);
-      });
-      for (var q = 0; q < 6; q++) {                                  // finish line
-        g.fillStyle = (q % 2) ? '#1b2a4a' : '#ffffff'; g.fillRect(TX1 + 14, ly + 3 + q * 9, 9, 9);
-        g.fillStyle = (q % 2) ? '#ffffff' : '#1b2a4a'; g.fillRect(TX1 + 23, ly + 3 + q * 9, 9, 9);
-      }
-    }
-    // hedges and bushes between the lanes, with little trees along the sides
-    for (i = 0; i <= 5; i++) {
-      var gy = LANE_Y0 + i * LANE_H;
-      for (x = 30; x < W - 26; x += 12) {
-        g.fillStyle = (Math.floor(x / 12) % 2) ? '#2f8f46' : '#3aa655';
-        g.beginPath(); g.arc(x + rand() * 3, gy + rand() * 2, 6.5, 0, Math.PI * 2); g.fill();
-        if (rand() < 0.08) { g.fillStyle = ['#ff8fc7', '#ffe14d', '#ffffff'][Math.floor(rand() * 3)]; g.beginPath(); g.arc(x, gy - 3, 2, 0, Math.PI * 2); g.fill(); }
-      }
-      if (i < 5) { drawTree(g, 18, gy + 44, 0.5, Math.floor(rand() * 3), false); drawTree(g, W - 18, gy + 44, 0.5, Math.floor(rand() * 3), rand() < 0.4); }
-    }
-  }
-
-  var bgCanvas = null;
   function drawRace() {
-    if (!bgCanvas) {
-      bgCanvas = document.createElement('canvas'); bgCanvas.width = W; bgCanvas.height = H;
-      drawMeadow(bgCanvas.getContext('2d'));
-    }
-    ctx.drawImage(bgCanvas, 0, 0);
+    ctx.fillStyle = '#1b2a4a'; ctx.fillRect(0, 0, W, H);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
-    // your lane gets a golden edge
-    if (player) {
-      ctx.strokeStyle = '#ffd23d'; ctx.lineWidth = 4;
-      ctx.strokeRect(40, LANE_Y0 + player.lane * LANE_H + 6, W - 80, LANE_H - 12);
+    // top message
+    ctx.font = '700 26px Fredoka, "Trebuchet MS", sans-serif';
+    var top;
+    if (bannerUntil > raceT && bannerText) { ctx.fillStyle = '#ffd23d'; top = bannerText; }
+    else if (state === 'countdown') { ctx.fillStyle = '#f2fbff'; top = 'Get ready!'; }
+    else if (player) {
+      ctx.fillStyle = '#f2fbff';
+      top = player.out ? 'Sitting out this race' : '🏁 You are in ' + ordinal(rank().indexOf(player) + 1) + ' place';
+    } else { top = ''; }
+    ctx.fillText(top, W / 2, 30);
+
+    // lanes
+    for (var i = 0; i < 5; i++) {
+      var el = ELEMENTS[i], I = INFO[el], y0 = LANE_Y0 + i * LANE_H;
+      ctx.fillStyle = I.lane; ctx.fillRect(40, y0 + 3, W - 80, LANE_H - 6);
+      ctx.font = '22px serif'; ctx.fillStyle = '#1b2a4a';
+      ctx.fillText(I.emoji, 22, y0 + LANE_H / 2);
+      // challenge gates
+      GATES.forEach(function (gt, gi) {
+        var gx = TX0 + (TX1 - TX0) * gt;
+        ctx.strokeStyle = 'rgba(27,42,74,.45)'; ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
+        ctx.beginPath(); ctx.moveTo(gx, y0 + 6); ctx.lineTo(gx, y0 + LANE_H - 6); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = '16px serif'; ctx.fillText('⚠️', gx, y0 + 12);
+      });
+      // finish line
+      for (var q = 0; q < 7; q++) {
+        ctx.fillStyle = (q % 2) ? '#1b2a4a' : '#ffffff';
+        ctx.fillRect(TX1 + 14, y0 + 6 + q * 9, 9, 9);
+        ctx.fillStyle = (q % 2) ? '#ffffff' : '#1b2a4a';
+        ctx.fillRect(TX1 + 23, y0 + 6 + q * 9, 9, 9);
+      }
+      if (player && I === INFO[player.el]) {
+        ctx.strokeStyle = '#ffd23d'; ctx.lineWidth = 4;
+        ctx.strokeRect(40, y0 + 3, W - 80, LANE_H - 6);
+      }
     }
 
-    // message at the top, on a little dark pill so it is easy to read
-    var top, topCol = '#ffffff';
-    if (bannerUntil > raceT && bannerText) { topCol = '#ffd23d'; top = bannerText; }
-    else if (state === 'countdown') top = 'Get ready!';
-    else if (player) top = player.out ? 'Sitting out this race' : '🏁 You are in ' + ordinal(rank().indexOf(player) + 1) + ' place';
-    else top = '';
-    if (top) {
-      ctx.font = '700 24px Fredoka, "Trebuchet MS", sans-serif';
-      var tw = top.length * 13 + 40;
-      ctx.fillStyle = 'rgba(27,42,74,.8)'; rr(ctx, W / 2 - tw / 2, 12, tw, 38, 19); ctx.fill();
-      ctx.fillStyle = topCol; ctx.fillText(top, W / 2, 32);
-    }
-
-    // unicorns (yours is drawn on top)
+    // unicorns (player on top)
     racers.slice().sort(function (a, b) { return (a.isPlayer ? 1 : 0) - (b.isPlayer ? 1 : 0); }).forEach(function (r) {
       var x = TX0 + (TX1 - TX0) * r.p, y = LANE_Y0 + r.lane * LANE_H + LANE_H / 2 + 10;
-      var inChallenge = r.isPlayer && (state === 'challenge' || state === 'out');
-      var waiting = r.out || r.finished || (r.pausedUntil > raceT) || inChallenge || state === 'countdown';
-      if (!r.out) drawUnicorn(ctx, r.el, x, y, waiting ? 0 : 3, 0, 0.62);
-      if (!r.finished && !r.out && (r.pausedUntil > raceT || inChallenge)) {
-        var usingPower = !r.isPlayer && r.fxUntil > raceT;
-        ctx.font = '18px serif'; ctx.fillStyle = '#1b2a4a';
+      var waiting = r.out || r.finished || (r.pausedUntil > raceT) || (r.isPlayer && (state === 'challenge' || state === 'out')) || state === 'countdown';
+      if (!(r.out)) drawUnicorn(ctx, r.el, x, y, waiting ? 0 : 3, 0, 0.62);
+      if (!r.finished && !r.out && (r.pausedUntil > raceT || (r.isPlayer && (state === 'challenge' || state === 'out')))) {
+        ctx.font = '18px serif'; ctx.fillStyle = '#1b2a4a'; var usingPower = !r.isPlayer && r.fxUntil > raceT;
         ctx.fillText(usingPower ? POWER_ICON[r.el] : '💭', x + 4, y - 40 - (usingPower ? 4 + Math.sin(raceT * 10) * 3 : 0));
       }
     });
 
-    ctx.font = '600 15px Fredoka, "Trebuchet MS", sans-serif';
-    ctx.fillStyle = 'rgba(27,42,74,.8)'; rr(ctx, W / 2 - 215, H - 40, 430, 28, 14); ctx.fill();
-    ctx.fillStyle = '#e8f0ff'; ctx.fillText('Wooden gates ⚠️ are where the screen zooms in', W / 2, H - 26);
+    // names under the track
+    ctx.font = '600 15px Fredoka, "Trebuchet MS", sans-serif'; ctx.fillStyle = '#c7d3f5';
+    ctx.fillText('Challenge gates ⚠️ are where the screen zooms in', W / 2, H - 28);
 
     if (state === 'countdown') {
       var n = Math.ceil(countdown);
