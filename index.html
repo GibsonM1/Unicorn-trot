@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unicorn Race</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+<style>
+  :root {
+    --night: #1b2a4a;
+    --lake: #8fd3f4;
+    --frost: #f2fbff;
+    --lilac: #b79cff;
+    --pink: #ff8fc7;
+    --gem: #3ddbd9;
+    --danger: #ff5a6e;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0;
+    background: linear-gradient(160deg, #1b2a4a 0%, #3b3f8f 60%, #6a4fb3 100%);
+    color: var(--frost);
+    font-family: "Fredoka", "Trebuchet MS", "Comic Sans MS", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px;
+  }
+  h1 { margin: 4px 0 8px; font-size: clamp(1.6rem, 5vw, 2.4rem); letter-spacing: .5px; }
+  #hud {
+    width: 100%; max-width: 820px;
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; font-size: 1.2rem; font-weight: 600; margin-bottom: 8px;
+  }
+  .pill { background: rgba(255,255,255,.14); border-radius: 999px; padding: 6px 16px; }
+  #stage { position: relative; width: 100%; max-width: 820px; }
+  canvas {
+    width: 100%; height: auto; display: block;
+    border-radius: 20px; border: 4px solid var(--frost);
+    background: var(--lake); touch-action: none;
+  }
+  .overlay {
+    position: absolute; inset: 0; border-radius: 20px;
+    background: rgba(27,42,74,.82);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; text-align: center; padding: 20px;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h2 { margin: 0; font-size: clamp(1.5rem, 5vw, 2.2rem); }
+  .overlay p { margin: 0; max-width: 34ch; font-size: 1.1rem; }
+  input[type=text] {
+    font: inherit; font-size: 1.3rem; text-align: center;
+    padding: 10px 16px; border-radius: 14px; border: 3px solid var(--lilac);
+    width: min(260px, 80%); background: var(--frost); color: var(--night);
+  }
+  button {
+    font: inherit; font-weight: 700; font-size: 1.2rem;
+    padding: 12px 26px; border-radius: 999px; border: 0;
+    background: var(--pink); color: var(--night); cursor: pointer;
+  }
+  button.secondary { background: var(--frost); }
+  button:hover { filter: brightness(1.08); }
+  button:focus-visible, input:focus-visible { outline: 4px solid var(--gem); outline-offset: 3px; }
+  #pad { display: none; margin-top: 12px; grid-template-columns: repeat(3, 72px); grid-template-rows: repeat(2, 72px); gap: 8px; justify-content: center; }
+  #pad button { padding: 0; font-size: 1.8rem; background: rgba(255,255,255,.85); user-select: none; -webkit-user-select: none; touch-action: none; }
+  #pad .up { grid-column: 2; grid-row: 1; }
+  #pad .left { grid-column: 1; grid-row: 2; }
+  #pad .down { grid-column: 2; grid-row: 2; }
+  #pad .right { grid-column: 3; grid-row: 2; }
+  @media (pointer: coarse) { #pad { display: grid; } }
+  .hint { opacity: .8; font-size: .95rem; margin-top: 8px; text-align: center; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+  <h1>🦄 Unicorn Race</h1>
+
+  <div id="hud">
+    <div class="pill" id="nameTag">Glacier</div>
+    <div class="pill" id="lives">❤️ 10</div>
+    <div class="pill" id="gems">💎 0</div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game" width="800" height="500" aria-label="Melting lake challenge"></canvas>
+
+    <div class="overlay" id="startScreen">
+      <h2>🧊 Ice Unicorn</h2>
+      <p>Name your unicorn, then slide across the melting lake. Don't touch the cracks!</p>
+      <input type="text" id="nameInput" maxlength="14" value="Glacier" aria-label="Unicorn name">
+      <button id="startBtn">Start the race</button>
+    </div>
+
+    <div class="overlay hidden" id="winScreen">
+      <h2>🎉 You made it across!</h2>
+      <p id="winText">+5 gems</p>
+      <button id="againBtn">Race again</button>
+    </div>
+
+    <div class="overlay hidden" id="outScreen">
+      <h2>💔 Out of lives</h2>
+      <p id="outText"></p>
+      <button id="rejoinBtn">Spend 20 💎 to rejoin</button>
+      <button id="sitBtn" class="secondary">Sit out, play the next race</button>
+    </div>
+  </div>
+
+  <div id="pad" aria-label="Touch controls">
+    <button class="up" data-dir="up" aria-label="Up">⬆️</button>
+    <button class="left" data-dir="left" aria-label="Left">⬅️</button>
+    <button class="down" data-dir="down" aria-label="Down">⬇️</button>
+    <button class="right" data-dir="right" aria-label="Right">➡️</button>
+  </div>
+  <div class="hint">Use the arrow keys to steer. Ice is slippery!</div>
+
+<script>
+(function () {
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  var START_LIVES = 10;
+  var REJOIN_COST = 20;
+  var REJOIN_LIVES = 5;   // placeholder until the designer decides
+  var GEMS_PER_CHALLENGE = 5;
+
+  var state = 'menu';     // menu | playing | won | out
+  var lives = START_LIVES;
+  var gems = 0;
+  var unicornName = 'Glacier';
+
+  // ---- saving gems in the browser (safe if storage is empty or blocked) ----
+  function loadGems() {
+    try { var v = localStorage.getItem('unicornRace.gems'); return v ? parseInt(v, 10) || 0 : 0; }
+    catch (e) { return 0; }
+  }
+  function saveGems() {
+    try { localStorage.setItem('unicornRace.gems', String(gems)); } catch (e) {}
+  }
+  gems = loadGems();
+
+  // ---- the unicorn ----
+  var uni = { x: 60, y: H / 2, vx: 0, vy: 0, r: 16 };
+  var START = { x: 60, y: H / 2 };
+  var invulnerable = 0;   // frames of safety after a hit
+  var flash = 0;
+
+  // ---- the melting lake ----
+  var LAKE = { top: 50, bottom: H - 50 };
+  var GOAL_X = W - 90;
+
+  // cracks: some stay still, some slide up and down
+  var cracks = [];
+  function buildCracks() {
+    cracks = [
+      { x: 190, y: 150, r: 34, vy: 0 },
+      { x: 190, y: 360, r: 34, vy: 0 },
+      { x: 300, y: 255, r: 40, vy: 1.2 },
+      { x: 420, y: 120, r: 36, vy: 0 },
+      { x: 420, y: 380, r: 36, vy: 0 },
+      { x: 530, y: 200, r: 38, vy: -1.6 },
+      { x: 530, y: 320, r: 38, vy: 1.6 },
+      { x: 640, y: 255, r: 42, vy: 1.0 }
+    ];
+  }
+  buildCracks();
+
+  // ---- keyboard + touch controls ----
+  var keys = { left: false, right: false, up: false, down: false };
+  var keyMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+  window.addEventListener('keydown', function (e) {
+    if (keyMap[e.key]) { keys[keyMap[e.key]] = true; if (state === 'playing') e.preventDefault(); }
+  });
+  window.addEventListener('keyup', function (e) {
+    if (keyMap[e.key]) { keys[keyMap[e.key]] = false; }
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#pad button'), function (b) {
+    var d = b.getAttribute('data-dir');
+    b.addEventListener('pointerdown', function (e) { e.preventDefault(); keys[d] = true; });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
+      b.addEventListener(ev, function () { keys[d] = false; });
+    });
+  });
+
+  // ---- screens and buttons ----
+  var startScreen = document.getElementById('startScreen');
+  var winScreen = document.getElementById('winScreen');
+  var outScreen = document.getElementById('outScreen');
+  var nameInput = document.getElementById('nameInput');
+
+  function show(el) { el.classList.remove('hidden'); }
+  function hide(el) { el.classList.add('hidden'); }
+
+  function updateHud() {
+    document.getElementById('nameTag').textContent = '🧊 ' + unicornName;
+    document.getElementById('lives').textContent = '❤️ ' + lives;
+    document.getElementById('gems').textContent = '💎 ' + gems;
+  }
+
+  function resetUnicorn() {
+    uni.x = START.x; uni.y = START.y; uni.vx = 0; uni.vy = 0;
+  }
+
+  function beginChallenge() {
+    buildCracks();
+    resetUnicorn();
+    hide(startScreen); hide(winScreen); hide(outScreen);
+    state = 'playing';
+    updateHud();
+  }
+
+  document.getElementById('startBtn').addEventListener('click', function () {
+    var n = nameInput.value.trim();
+    unicornName = n ? n.slice(0, 14) : 'Glacier';
+    lives = START_LIVES;
+    beginChallenge();
+  });
+
+  document.getElementById('againBtn').addEventListener('click', function () {
+    lives = START_LIVES;
+    beginChallenge();
+  });
+
+  document.getElementById('rejoinBtn').addEventListener('click', function () {
+    if (gems >= REJOIN_COST) {
+      gems -= REJOIN_COST; saveGems();
+      lives = REJOIN_LIVES;
+      beginChallenge();
+    }
+  });
+
+  document.getElementById('sitBtn').addEventListener('click', function () {
+    lives = START_LIVES;
+    beginChallenge();
+  });
+
+  function loseLife() {
+    lives -= 1;
+    flash = 24;
+    invulnerable = 60;
+    resetUnicorn();
+    updateHud();
+    if (lives <= 0) {
+      state = 'out';
+      var canRejoin = gems >= REJOIN_COST;
+      document.getElementById('rejoinBtn').style.display = canRejoin ? '' : 'none';
+      document.getElementById('outText').textContent = canRejoin
+        ? unicornName + ' is out of the race. You have ' + gems + ' gems, so you can spend ' + REJOIN_COST + ' to jump back in.'
+        : unicornName + ' sits out the rest of this race, but you get to play the next one.';
+      show(outScreen);
+    }
+  }
+
+  function winChallenge() {
+    state = 'won';
+    gems += GEMS_PER_CHALLENGE;
+    saveGems();
+    updateHud();
+    document.getElementById('winText').textContent = '+' + GEMS_PER_CHALLENGE + ' gems! You now have ' + gems + ' 💎';
+    show(winScreen);
+  }
+
+  // ---- game loop ----
+  var ACCEL = 0.5, FRICTION = 0.94, MAX = 5;
+
+  function update() {
+    if (state !== 'playing') return;
+
+    var ax = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    var ay = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    uni.vx += ax * ACCEL; uni.vy += ay * ACCEL;
+    uni.vx *= FRICTION;   uni.vy *= FRICTION;
+    var sp = Math.sqrt(uni.vx * uni.vx + uni.vy * uni.vy);
+    if (sp > MAX) { uni.vx = uni.vx / sp * MAX; uni.vy = uni.vy / sp * MAX; }
+    uni.x += uni.vx; uni.y += uni.vy;
+
+    // stay inside the lake
+    if (uni.x < uni.r) { uni.x = uni.r; uni.vx = 0; }
+    if (uni.y < LAKE.top + uni.r) { uni.y = LAKE.top + uni.r; uni.vy = 0; }
+    if (uni.y > LAKE.bottom - uni.r) { uni.y = LAKE.bottom - uni.r; uni.vy = 0; }
+
+    // moving cracks
+    cracks.forEach(function (c) {
+      c.y += c.vy;
+      if (c.y - c.r < LAKE.top || c.y + c.r > LAKE.bottom) c.vy = -c.vy;
+    });
+
+    if (invulnerable > 0) invulnerable--;
+    if (flash > 0) flash--;
+
+    // touching a crack
+    if (invulnerable === 0) {
+      for (var i = 0; i < cracks.length; i++) {
+        var c = cracks[i];
+        var dx = uni.x - c.x, dy = uni.y - c.y;
+        // the danger is a little smaller than it looks, so it feels fair
+        if (Math.sqrt(dx * dx + dy * dy) < c.r * 0.8 + uni.r * 0.6) { loseLife(); return; }
+      }
+    }
+
+    // reached the other side
+    if (uni.x >= GOAL_X) winChallenge();
+  }
+
+  function drawCrack(c) {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    // dark water showing through
+    ctx.fillStyle = '#16356b';
+    ctx.beginPath(); ctx.ellipse(0, 0, c.r, c.r * 0.78, 0, 0, Math.PI * 2); ctx.fill();
+    // jagged crack lines
+    ctx.strokeStyle = '#e8f7ff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    for (var a = 0; a < 6; a++) {
+      var ang = a * Math.PI / 3 + c.r;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(ang) * c.r * 0.7, Math.sin(ang) * c.r * 0.6);
+      ctx.lineTo(Math.cos(ang + 0.3) * c.r * 1.25, Math.sin(ang + 0.3) * c.r * 1.05);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function draw() {
+    // lake
+    var g = ctx.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, '#c9ecff'); g.addColorStop(1, '#8fd3f4');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    // snowy banks (top and bottom)
+    ctx.fillStyle = '#f7fdff';
+    ctx.fillRect(0, 0, W, LAKE.top);
+    ctx.fillRect(0, LAKE.bottom, W, H - LAKE.bottom);
+
+    // shiny ice streaks
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
+    for (var i = 0; i < 9; i++) {
+      var sx = 60 + i * 85, sy = 90 + (i * 53) % 330;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + 30, sy - 8); ctx.stroke();
+    }
+
+    // goal (far shore)
+    ctx.fillStyle = 'rgba(183,156,255,.45)';
+    ctx.fillRect(GOAL_X, LAKE.top, W - GOAL_X, LAKE.bottom - LAKE.top);
+    ctx.font = '44px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🏁', GOAL_X + 45, H / 2);
+
+    // start shore
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.fillRect(0, LAKE.top, 30, LAKE.bottom - LAKE.top);
+
+    cracks.forEach(drawCrack);
+
+    // unicorn (blinks while safe after a hit)
+    var blink = invulnerable > 0 && Math.floor(invulnerable / 6) % 2 === 0;
+    if (!blink) {
+      ctx.font = '40px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🦄', uni.x, uni.y);
+    }
+
+    // red flash when hit
+    if (flash > 0) {
+      ctx.fillStyle = 'rgba(255,90,110,' + (flash / 24 * 0.5) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function loop() { update(); draw(); requestAnimationFrame(loop); }
+  updateHud();
+  loop();
+})();
+</script>
+</body>
+</html>
