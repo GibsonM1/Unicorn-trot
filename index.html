@@ -126,6 +126,7 @@
     <input type="text" id="nameInput" maxlength="14" value="Glacier" aria-label="Unicorn name">
     <button id="startBtn">Start the race</button>
     <button id="shopBtn" class="secondary">🛍️ Shop</button>
+    <button id="boardBtn" class="secondary">🏆 Winners board</button>
   </div>
 
   <div class="overlay hidden" id="outScreen">
@@ -141,9 +142,16 @@
     <p id="resGems"></p>
     <button id="raceAgainBtn">Race again</button>
     <button id="shopBtn2" class="secondary">🛍️ Shop</button>
+    <button id="boardBtn2" class="secondary">🏆 Winners board</button>
   </div>
 
-<div class="overlay hidden" id="shopScreen">
+<div class="overlay hidden" id="boardScreen">
+    <h2>🏆 Winners board</h2>
+    <div class="shopBox" id="boardBox"></div>
+    <button id="boardDoneBtn">Done</button>
+  </div>
+
+  <div class="overlay hidden" id="shopScreen">
     <h2>🛍️ Shop</h2>
     <p id="shopGems"></p>
     <div class="shopBox">
@@ -158,6 +166,12 @@
       <div class="swatches" id="swatches"></div>
       <p id="colorMsg">1. Pick a color. 2. Tap the horn, mane, body, or tail.</p>
       <button id="resetColorsBtn" class="secondary small">Back to original colors (free)</button>
+    </div>
+    <div class="shopBox">
+      <h3>🎁 Prizes: 10 💎 each</h3>
+      <p>For your <span id="prizeFor"></span> unicorn. Tap once to buy, tap again to take it off or put it back on.</p>
+      <div class="picker" id="prizeBtns"></div>
+      <p id="prizeMsg"></p>
     </div>
     <button id="shopDoneBtn">Done</button>
   </div>
@@ -207,6 +221,17 @@
   var powers = {}, colors = {}, powerUses = POWER_USES;
   try { powers = JSON.parse(lsGet('unicornRace.powers') || '{}') || {}; } catch (e) { powers = {}; }
   try { colors = JSON.parse(lsGet('unicornRace.colors') || '{}') || {}; } catch (e) { colors = {}; }
+  var prizes = {};   // prizes[unicorn][item]: 1 = wearing it, 2 = bought but not wearing
+  try { prizes = JSON.parse(lsGet('unicornRace.prizes') || '{}') || {}; } catch (e) { prizes = {}; }
+  function savePrizes() { lsSet('unicornRace.prizes', JSON.stringify(prizes)); }
+  var PRIZE_COST = 10;
+  var PRIZE_LIST = [
+    { id: 'sparkle', label: '✨ Sparkly horn' },
+    { id: 'ribbon', label: '🎀 Ribbon' },
+    { id: 'crown', label: '👑 Crown' },
+    { id: 'wings', label: '🦋 Wings' }
+  ];
+  var POWER_ICON = { ice: '❄️', water: '🌊', fire: '🔥', plant: '🌿', weather: '⚡' };
   function savePowers() { lsSet('unicornRace.powers', JSON.stringify(powers)); }
   function saveColors() { lsSet('unicornRace.colors', JSON.stringify(colors)); }
   var POWER_TEXT = {
@@ -244,9 +269,25 @@
 
   // ================= sound: music + effects (made with the browser, no files) =================
   var AC = null, master, musicGain, sfxGain, noiseBuf = null;
-  var STEP = 0.1;                       // one music step in seconds (fast and exciting)
-  var BASS = [45, 41, 48, 43];          // A, F, C, G
-  var ARP = [[69, 72, 76], [65, 69, 72], [72, 76, 79], [67, 71, 74]];
+  // every unicorn has her own song
+  var THEMES = {
+    ice:     { step: 0.11,  bass: [48, 45, 41, 43], bassWave: 'triangle', bassVol: 0.09, offbeat: false,
+               arp: [[72, 76, 79], [69, 72, 76], [65, 69, 72], [67, 71, 74]], arpWave: 'triangle', arpVol: 0.05,
+               kicks: [0, 8], snares: [12], hats: 'odd', rumble: false },
+    water:   { step: 0.12,  bass: [45, 43, 41, 43], bassWave: 'sine', bassVol: 0.14, offbeat: false,
+               arp: [[69, 72, 76], [67, 71, 74], [65, 69, 72], [67, 71, 74]], arpWave: 'sine', arpVol: 0.06,
+               kicks: [0, 8], snares: [], hats: 'none', rumble: false },
+    fire:    { step: 0.085, bass: [40, 40, 43, 38], bassWave: 'sawtooth', bassVol: 0.06, offbeat: false,
+               arp: [[64, 67, 71], [64, 67, 71], [67, 71, 74], [62, 66, 69]], arpWave: 'sawtooth', arpVol: 0.03,
+               kicks: [0, 4, 8, 12], snares: [4, 12], hats: 'odd', rumble: false },
+    plant:   { step: 0.1,   bass: [48, 43, 45, 41], bassWave: 'triangle', bassVol: 0.12, offbeat: true,
+               arp: [[72, 76, 79], [67, 71, 74], [69, 72, 76], [65, 69, 72]], arpWave: 'square', arpVol: 0.03,
+               kicks: [0, 8], snares: [4, 12], hats: 'odd', rumble: false },
+    weather: { step: 0.095, bass: [38, 38, 34, 36], bassWave: 'sawtooth', bassVol: 0.06, offbeat: false,
+               arp: [[62, 65, 69], [62, 65, 69], [58, 62, 65], [60, 64, 67]], arpWave: 'square', arpVol: 0.03,
+               kicks: [0, 6, 8, 14], snares: [4, 12], hats: 'odd', rumble: true }
+  };
+  var theme = THEMES.fire;
   var musicStep = 0, nextNoteTime = 0, musicTimer = null;
 
   function mtof(n) { return 440 * Math.pow(2, (n - 69) / 12); }
@@ -271,17 +312,17 @@
     s.start(start); s.stop(start + dur + 0.03);
   }
   function playStep(step, t) {
-    var bar = Math.floor(step / 16) % 4, s = step % 16;
-    if (s % 2 === 0) {                                  // bouncy bass
-      var n = BASS[bar] + (s % 4 === 2 ? 12 : 0);
-      tone(mtof(n), t, STEP * 1.8, 'square', 0.07, null, musicGain);
+    var T = theme, st = T.step, bar = Math.floor(step / 16) % 4, s = step % 16;
+    if (T.offbeat ? (s % 4 === 2) : (s % 2 === 0)) {
+      tone(mtof(T.bass[bar] + (s % 4 === 2 ? 12 : 0)), t, st * 1.8, T.bassWave, T.bassVol, null, musicGain);
     }
-    if (s % 4 === 0) tone(150, t, 0.12, 'sine', 0.35, 45, musicGain);   // drum
-    if (s === 4 || s === 12) noise(t, 0.09, 0.16, 1500);                // snare
-    if (s % 2 === 1) noise(t, 0.03, 0.05, 7000);                        // hi-hat
-    var chord = ARP[bar];
+    if (T.kicks.indexOf(s) >= 0) tone(150, t, 0.12, 'sine', 0.35, 45, musicGain);
+    if (T.snares.indexOf(s) >= 0) noise(t, 0.09, 0.16, 1500);
+    if (T.hats === 'odd' && s % 2 === 1) noise(t, 0.03, 0.05, 7000);
+    if (T.rumble && s === 0 && bar % 2 === 0) noise(t, 0.7, 0.1, 100);
+    var chord = T.arp[bar];
     var note = chord[[0, 1, 2, 1][s % 4]] + (s >= 8 && s % 4 === 3 ? 12 : 0);
-    tone(mtof(note), t, STEP * 0.9, 'square', 0.035, null, musicGain);  // sparkly racing notes
+    tone(mtof(note), t, st * 0.9, T.arpWave, T.arpVol, null, musicGain);
   }
   function startMusic() {
     if (musicTimer || !AC) return;
@@ -289,7 +330,7 @@
     musicTimer = setInterval(function () {
       while (nextNoteTime < AC.currentTime + 0.2) {
         playStep(musicStep, nextNoteTime);
-        nextNoteTime += STEP;
+        nextNoteTime += theme.step;
         musicStep = (musicStep + 1) % 64;
       }
     }, 30);
@@ -383,6 +424,7 @@
     var bodyCol = C.body || I.body, legCol = C.body || I.legs;
     var tailCol = C.tail || I.tail, tail2Col = C.tail ? lighten(C.tail, 0.55) : I.tail2;
     var hornCol = C.horn || I.horn;
+    var P = prizes[el] || {};
     var speed = Math.sqrt(vx * vx + vy * vy);
     var trot = Math.sin(tick / 4) * Math.min(speed, 4) * 1.6;
     c.save(); c.translate(x, y); c.scale(scale, scale);
@@ -408,6 +450,15 @@
     [[-10, 1], [-5, -1], [8, -1], [13, 1]].forEach(function (l) {
       c.beginPath(); c.moveTo(l[0], 8); c.lineTo(l[0] + trot * l[1], 19); c.stroke();
     });
+    // wings (behind her body)
+    if (P.wings === 1) {
+      var flap = Math.sin(tick / 5) * 0.25;
+      c.save(); c.translate(-2, -4); c.rotate(-0.5 + flap);
+      c.fillStyle = '#ffffff'; c.strokeStyle = I.outline; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-8, -26, -22, -24); c.quadraticCurveTo(-16, -14, -18, -8);
+      c.quadraticCurveTo(-10, -6, 0, 0); c.closePath(); c.fill(); c.stroke();
+      c.restore();
+    }
     // body, neck, head
     c.fillStyle = bodyCol; c.strokeStyle = I.outline; c.lineWidth = 2;
     c.beginPath(); c.ellipse(0, 3, 18, 10, 0, 0, Math.PI * 2); c.fill(); c.stroke();
@@ -420,6 +471,31 @@
     // horn
     c.fillStyle = hornCol; c.strokeStyle = 'rgba(27,42,74,.45)'; c.lineWidth = 1.5;
     c.beginPath(); c.moveTo(22, -16); c.lineTo(33, -30); c.lineTo(26, -14); c.closePath(); c.fill(); c.stroke();
+    // prizes she is wearing
+    if (P.crown === 1) {
+      c.fillStyle = '#ffd23d'; c.strokeStyle = '#e09f00'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(15, -17); c.lineTo(15, -24); c.lineTo(18, -21); c.lineTo(21, -26); c.lineTo(24, -21); c.lineTo(27, -24); c.lineTo(27, -17);
+      c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#ff5a6e'; c.beginPath(); c.arc(21, -19, 1.4, 0, Math.PI * 2); c.fill();
+    }
+    if (P.ribbon === 1) {
+      var rc = C.ribbon || '#ff8fc7';
+      c.fillStyle = rc; c.strokeStyle = 'rgba(27,42,74,.4)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(6, -14); c.lineTo(-1, -19); c.lineTo(-1, -9); c.closePath(); c.fill(); c.stroke();
+      c.beginPath(); c.moveTo(6, -14); c.lineTo(13, -19); c.lineTo(13, -9); c.closePath(); c.fill(); c.stroke();
+      c.beginPath(); c.arc(6, -14, 2.6, 0, Math.PI * 2); c.fill(); c.stroke();
+    }
+    if (P.sparkle === 1) {
+      [[36, -34], [29, -37], [39, -25]].forEach(function (sp, i) {
+        var sz = 1.5 + 3.5 * Math.abs(Math.sin(tick / 8 + i * 2));
+        c.fillStyle = '#fff7b0';
+        c.beginPath();
+        c.moveTo(sp[0], sp[1] - sz); c.lineTo(sp[0] + sz * 0.3, sp[1] - sz * 0.3); c.lineTo(sp[0] + sz, sp[1]);
+        c.lineTo(sp[0] + sz * 0.3, sp[1] + sz * 0.3); c.lineTo(sp[0], sp[1] + sz); c.lineTo(sp[0] - sz * 0.3, sp[1] + sz * 0.3);
+        c.lineTo(sp[0] - sz, sp[1]); c.lineTo(sp[0] - sz * 0.3, sp[1] - sz * 0.3);
+        c.closePath(); c.fill();
+      });
+    }
     // the weather unicorn wears a lightning bolt
     if (el === 'weather') {
       c.fillStyle = '#ffd23d'; c.strokeStyle = '#e09f00'; c.lineWidth = 1;
@@ -452,7 +528,7 @@
       var isP = el === selected;
       return { el: el, name: isP ? unicornName : INFO[el].name, p: 0, lane: i,
                speed: isP ? 0.034 : 0.031 + Math.random() * 0.006,
-               finished: false, finishIdx: -1, pausedUntil: 0, gatesDone: 0, isPlayer: isP, out: false };
+               finished: false, finishIdx: -1, pausedUntil: 0, gatesDone: 0, isPlayer: isP, out: false, powerLeft: 3, fxUntil: 0, finishTime: null };
     });
     player = racers.filter(function (r) { return r.isPlayer; })[0];
     countdown = 3.4; raceT = 0; finishCount = 0; gemsThisRace = 0; bannerText = ''; bannerUntil = 0;
@@ -797,7 +873,8 @@
       var waiting = r.out || r.finished || (r.pausedUntil > raceT) || (r.isPlayer && (state === 'challenge' || state === 'out')) || state === 'countdown';
       if (!(r.out)) drawUnicorn(ctx, r.el, x, y, waiting ? 0 : 3, 0, 0.8);
       if (!r.finished && !r.out && (r.pausedUntil > raceT || (r.isPlayer && (state === 'challenge' || state === 'out')))) {
-        ctx.font = '18px serif'; ctx.fillStyle = '#1b2a4a'; ctx.fillText('💭', x + 4, y - 30);
+        ctx.font = '18px serif'; ctx.fillStyle = '#1b2a4a'; var usingPower = !r.isPlayer && r.fxUntil > raceT;
+        ctx.fillText(usingPower ? POWER_ICON[r.el] : '💭', x + 4, y - 30 - (usingPower ? 4 + Math.sin(raceT * 10) * 3 : 0));
       }
     });
 
@@ -834,16 +911,42 @@
       if (r.gatesDone < 3 && r.p >= GATES[r.gatesDone]) {
         r.p = GATES[r.gatesDone];
         if (r.isPlayer) startChallenge(r.gatesDone);
-        else { r.gatesDone++; r.pausedUntil = raceT + 5 + Math.random() * 5; }   // robots take 5 to 10 seconds
+        else {
+          r.gatesDone++;
+          var delay = 5 + Math.random() * 5;                       // robots take 5 to 10 seconds
+          if (r.powerLeft > 0 && Math.random() < 0.6) {            // ...but they use powers now, 3 per race
+            r.powerLeft--; delay = Math.max(2.5, delay - 3); r.fxUntil = raceT + 1.4;
+            if (AC) tone(760, AC.currentTime, 0.1, 'triangle', 0.1, 1100);
+          }
+          r.pausedUntil = raceT + delay;
+        }
         return;
       }
       if (r.p >= 1) {
-        r.p = 1; r.finished = true; r.finishIdx = finishCount++;
+        r.p = 1; r.finished = true; r.finishIdx = finishCount++; r.finishTime = raceT;
         if (r.isPlayer) { state = 'finishing'; finishTimer = 1.4; sfxFinish(r.finishIdx + 1); }
       }
     });
     if (state === 'challenge') updateChallenge();
     if (state === 'finishing') { finishTimer -= dt; if (finishTimer <= 0) showResults(); }
+  }
+
+  function loadBoard() {
+    var b; try { b = JSON.parse(lsGet('unicornRace.board') || 'null'); } catch (e) { b = null; }
+    if (!b) b = { games: 0, wins: {}, podium: 0, bestPlace: 5, fastest: null, history: [] };
+    return b;
+  }
+  function recordBoard(place, time) {
+    var b = loadBoard(), newFastest = false;
+    b.games++;
+    if (place === 1) b.wins[selected] = (b.wins[selected] || 0) + 1;
+    if (place <= 2) b.podium++;
+    b.bestPlace = Math.min(b.bestPlace || 5, place);
+    if (time != null && (!b.fastest || time < b.fastest.time)) { b.fastest = { time: time, el: selected, name: unicornName }; newFastest = true; }
+    b.history.unshift({ place: place, el: selected, name: unicornName, time: time });
+    b.history = b.history.slice(0, 8);
+    lsSet('unicornRace.board', JSON.stringify(b));
+    return { fastest: newFastest };
   }
 
   function showResults() {
@@ -852,6 +955,7 @@
     var placeGems = place === 1 ? GEMS_FIRST : (place === 2 ? GEMS_SECOND : 0);
     gems += placeGems; lsSet('unicornRace.gems', gems);
     saveResultHistory(place);
+    var rec = recordBoard(place, player.finished ? player.finishTime : null);
     state = 'results';
     document.getElementById('resTitle').textContent = player.out
       ? 'You sat out this race'
@@ -865,7 +969,7 @@
     });
     document.getElementById('resGems').textContent =
       '+' + gemsThisRace + ' 💎 from challenges' + (placeGems ? ', +' + placeGems + ' 💎 for ' + ordinal(place) + ' place' : '') +
-      '. You now have ' + gems + ' 💎' + (gems >= 10 ? '. Visit the shop to spend them!' : '');
+      '. You now have ' + gems + ' 💎' + (rec.fastest ? '. ⏱️ New fastest race!' : '') + (gems >= 10 ? ' Visit the shop to spend your gems!' : '');
     updateHud();
     show('resultsScreen');
   }
@@ -903,6 +1007,7 @@
   });
 
   document.getElementById('startBtn').addEventListener('click', function () {
+    theme = THEMES[selected];
     initAudio();
     var n = nameInput.value.trim();
     unicornName = n ? n.slice(0, 14) : INFO[selected].name;
@@ -956,6 +1061,32 @@
     Array.prototype.forEach.call(document.getElementById('shopPicker').children, function (b) {
       b.classList.toggle('sel', b.getAttribute('data-el') === shopEl);
     });
+    renderPrizes();
+  }
+
+  function renderPrizes() {
+    document.getElementById('prizeFor').textContent = INFO[shopEl].emoji + ' ' + INFO[shopEl].label;
+    var box = document.getElementById('prizeBtns'); box.innerHTML = '';
+    var mine = prizes[shopEl] = prizes[shopEl] || {};
+    PRIZE_LIST.forEach(function (it) {
+      var b = document.createElement('button');
+      b.className = 'pick small' + (mine[it.id] === 1 ? ' sel' : '');
+      b.textContent = it.label + (mine[it.id] ? (mine[it.id] === 1 ? ': ON' : ': OFF') : ': ' + PRIZE_COST + ' 💎');
+      b.addEventListener('click', function () {
+        var msg = document.getElementById('prizeMsg');
+        if (!mine[it.id]) {
+          if (gems < PRIZE_COST) { msg.textContent = 'You need ' + PRIZE_COST + ' 💎 for that prize.'; return; }
+          gems -= PRIZE_COST; lsSet('unicornRace.gems', gems);
+          mine[it.id] = 1; initAudio(); sfxGem();
+          msg.textContent = 'You got it! ' + (it.id === 'ribbon' ? 'Pick a color, then tap the ribbon to change its color.' : 'Your unicorn is wearing it.');
+        } else {
+          mine[it.id] = mine[it.id] === 1 ? 2 : 1;
+          msg.textContent = mine[it.id] === 1 ? 'Put it on!' : 'Took it off. You still own it.';
+        }
+        savePrizes(); refreshShop();
+      });
+      box.appendChild(b);
+    });
   }
 
   function openShop(from) {
@@ -997,6 +1128,8 @@
 
   // which part of the unicorn did you tap? (coordinates are in the unicorn's own space)
   function partAt(x, y) {
+    var mineP = prizes[shopEl] || {};
+    if (mineP.ribbon === 1 && Math.sqrt((x - 6) * (x - 6) + (y + 14) * (y + 14)) < 7.5) return 'ribbon';
     if (distSeg(x, y, 24, -15, 32, -29) < 4.5) return 'horn';
     if (inE(x, y, 0, 3, 19, 11) || inE(x, y, 13, -5, 8, 11) || inE(x, y, 21, -11, 10, 7.5) ||
         (x > 13 && x < 20 && y > -24 && y < -15) || (y > 7 && y < 21 && ((x > -13 && x < -2) || (x > 5 && x < 16)))) return 'body';
@@ -1018,7 +1151,7 @@
     var cx = (e.clientX - r.left) * (shopCanvas.width / r.width), cy = (e.clientY - r.top) * (shopCanvas.height / r.height);
     var part = partAt((cx - SHOP_X) / SHOP_SC, (cy - SHOP_Y) / SHOP_SC);
     if (!chosenColor) { setColorMsg('Pick a color first!'); return; }
-    if (!part) { setColorMsg('Tap the unicorn: horn, mane, body, or tail.'); return; }
+    if (!part) { setColorMsg('Tap the unicorn: horn, mane, body, tail, or ribbon.'); return; }
     if (gems < COLOR_COST) { setColorMsg('You need ' + COLOR_COST + ' 💎 to change a color.'); return; }
     gems -= COLOR_COST; lsSet('unicornRace.gems', gems);
     colors[shopEl] = colors[shopEl] || {}; colors[shopEl][part] = chosenColor; saveColors();
@@ -1053,6 +1186,30 @@
     drawUnicorn(sctx, shopEl, SHOP_X, SHOP_Y, 0, 0, SHOP_SC);
     tick = saved;
   }
+
+  var boardReturn = 'startScreen';
+  function openBoard(from) {
+    boardReturn = from; hide(from);
+    var b = loadBoard(), box = document.getElementById('boardBox');
+    box.innerHTML = '';
+    function line(t, bold) { var p = document.createElement('p'); p.textContent = t; if (bold) p.style.fontWeight = '700'; box.appendChild(p); }
+    var wins = 0; ELEMENTS.forEach(function (el) { wins += b.wins[el] || 0; });
+    line('Races played: ' + b.games, true);
+    line('🥇 Wins: ' + wins + '     🏅 Top 2 finishes: ' + b.podium);
+    line('Best place: ' + (b.games ? ordinal(b.bestPlace) : 'none yet'));
+    line('⏱️ Fastest race: ' + (b.fastest ? b.fastest.time.toFixed(1) + ' seconds with ' + INFO[b.fastest.el].emoji + ' ' + b.fastest.name : 'none yet'));
+    line('Wins by unicorn: ' + ELEMENTS.map(function (el) { return INFO[el].emoji + ' ' + (b.wins[el] || 0); }).join('   '));
+    if (b.history.length) {
+      line('Last races:', true);
+      b.history.forEach(function (h) {
+        line(ordinal(h.place) + ' place: ' + INFO[h.el].emoji + ' ' + h.name + (h.time ? ', ' + h.time.toFixed(1) + ' seconds' : ', sat out'));
+      });
+    }
+    show('boardScreen');
+  }
+  document.getElementById('boardBtn').addEventListener('click', function () { openBoard('startScreen'); });
+  document.getElementById('boardBtn2').addEventListener('click', function () { openBoard('resultsScreen'); });
+  document.getElementById('boardDoneBtn').addEventListener('click', function () { hide('boardScreen'); show(boardReturn); });
 
   var muteBtn = document.getElementById('muteBtn');
   function paintMute() { muteBtn.textContent = muted ? '🔇' : '🔊'; }
