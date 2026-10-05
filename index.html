@@ -445,7 +445,7 @@
 
     function leg(x0, dx, far) {
       var fx = x0 + dx * 0.9;
-      function path() { c.beginPath(); c.moveTo(x0 - 3.2, 6); c.lineTo(fx - 1.7, 21); c.lineTo(fx + 1.7, 21); c.lineTo(x0 + 3.2, 6); c.closePath(); }
+      function path() { c.beginPath(); c.moveTo(x0 - 3.2, 4); c.lineTo(fx - 1.7, 21); c.lineTo(fx + 1.7, 21); c.lineTo(x0 + 3.2, 4); c.closePath(); }
       c.strokeStyle = I.outline; c.lineWidth = 2.8; path(); c.stroke();
       c.fillStyle = bodyCol; path(); c.fill();
       if (far) { c.fillStyle = 'rgba(27,42,74,.14)'; path(); c.fill(); }
@@ -453,12 +453,12 @@
       c.beginPath(); c.moveTo(fx - 2.3, 20.5); c.lineTo(fx + 2.3, 20.5); c.lineTo(fx + 2.8, 24); c.lineTo(fx - 2.8, 24); c.closePath(); c.fill();
     }
     function tBody() {
-      c.beginPath(); c.moveTo(-19, 2);
+      c.beginPath(); c.moveTo(-19, 1);
       c.bezierCurveTo(-19, -8, -8, -10, 2, -9);
-      c.bezierCurveTo(9, -9, 17, -9, 19, -2);
-      c.bezierCurveTo(21, 5, 17, 12, 8, 12);
-      c.bezierCurveTo(-2, 13, -12, 13, -17, 10);
-      c.bezierCurveTo(-21, 8, -21, 5, -19, 2);
+      c.bezierCurveTo(9, -9, 17, -9, 19, -3);
+      c.bezierCurveTo(20, 2, 17, 8, 9, 8.5);
+      c.bezierCurveTo(0, 9, -10, 9, -16, 7.5);
+      c.bezierCurveTo(-20, 6, -21, 4, -19, 1);
       c.closePath();
     }
     function tNeck() {
@@ -511,7 +511,7 @@
     // the weather unicorn wears a lightning bolt on her side
     if (el === 'weather') {
       c.fillStyle = '#ffd23d'; c.strokeStyle = '#e09f00'; c.lineWidth = 1;
-      c.beginPath(); c.moveTo(1, -3); c.lineTo(-6, 5); c.lineTo(-2, 5); c.lineTo(-5, 11); c.lineTo(4, 3); c.lineTo(0, 3);
+      c.beginPath(); c.moveTo(1, -5); c.lineTo(-5, 2); c.lineTo(-2, 2); c.lineTo(-4, 7); c.lineTo(3, 0); c.lineTo(0, 0);
       c.closePath(); c.fill(); c.stroke();
     }
 
@@ -1324,8 +1324,8 @@
     }
     tip = lockTip(FORE_A[0], FORE_A[1], FORE_A[2], 0.5, -1, 0, 0, 0);
     if (distSeg(x, y, FORE_A[0], FORE_A[1], tip.x, tip.y) < FORE_A[3] + 3) return 'mane';
-    if (inE(x, y, 0, 2, 20, 11) || inE(x, y, 15, -16, 8.5, 14) || inE(x, y, 29, -25, 11, 8) ||
-        (x > 19 && x < 26 && y > -41 && y < -31) || (y > 6 && y < 24 && ((x > -17 && x < -5) || (x > 5 && x < 19)))) return 'body';
+    if (inE(x, y, 0, 0, 20, 9.5) || inE(x, y, 15, -16, 8.5, 14) || inE(x, y, 29, -25, 11, 8) ||
+        (x > 19 && x < 26 && y > -41 && y < -31) || (y > 4 && y < 24 && ((x > -17 && x < -5) || (x > 5 && x < 19)))) return 'body';
     for (i = 0; i < TAIL_A.length; i++) {
       a = TAIL_A[i]; tip = lockTip(a[0], a[1], a[2], 0.75, 1, Math.sin(i) * 4, 0, 0);
       if (distSeg(x, y, a[0], a[1], tip.x, tip.y) < a[3] + 3) return 'tail';
