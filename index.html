@@ -397,9 +397,11 @@
   var tick = 0;
 
   // ---- the unicorn's shape (she faces right) ----
-  var MANE_A = [[24, -37, 15, 4], [21.5, -32, 21, 4.4], [19, -28, 24, 4.6], [16.5, -23.5, 24, 4.6], [14, -18.5, 22, 4.4], [12, -14, 19, 4], [10, -10.5, 15, 3.6]];
-  var FORE_A = [27, -39, 10, 3];
-  var TAIL_A = [[-21, -5, 30, 4.8], [-22, -1, 34, 5], [-21.5, 3, 32, 4.8], [-20, 6, 26, 4.2]];
+  var MANE_A = [[22.7, -38.6, 15, 4.8], [21.5, -32, 21, 5.3], [19, -28, 24, 5.5], [16.5, -23.5, 24, 5.5], [14, -18.5, 22, 5.3], [12, -14, 19, 4.8], [10, -10.5, 15, 4.3]];
+  var FORE_A = [26.3, -41, 11, 3.6];
+  var TAIL_A = [[-21, -5, 30, 5.6], [-22, -1, 34, 6], [-21.5, 3, 32, 5.6], [-20, 6, 26, 5]];
+  // her head is a little bigger now (this works out where a spot on the head ends up)
+  function hp(x, y) { return [31 + 1.18 * (x - 31), -28 + 1.18 * (y + 28)]; }
 
   function mixHex(a, b, t) {
     var A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16);
@@ -461,7 +463,7 @@
     }
     // a leg with a knee (front legs) or a hock (hind legs) and a dark hoof
     function leg(hx, hy, dx, hind, far) {
-      var kx = hx + (hind ? -3.5 : 1.2) + dx * 0.4, ky = 17, fx = hx + (hind ? -1.5 : 1.5) + dx, fy = 26;
+      var kx = hx + (hind ? -3.5 : 1.2) + dx * 0.4, ky = 16.5, fx = hx + (hind ? -1.5 : 1.5) + dx, fy = 24.5;
       seg(hx, hy, kx, ky, 9, I.outline); seg(kx, ky, fx, fy, 5.8, I.outline);
       seg(hx, hy, kx, ky, 6.8, bodyCol); seg(kx, ky, fx, fy, 3.6, bodyCol);
       if (far) { seg(hx, hy, kx, ky, 6.8, 'rgba(27,42,74,.17)'); seg(kx, ky, fx, fy, 3.6, 'rgba(27,42,74,.17)'); }
@@ -486,12 +488,14 @@
       c.closePath();
     }
     function tHead() {
+      c.save(); c.translate(31, -28); c.scale(1.18, 1.18); c.translate(-31, 28);
       c.beginPath(); c.moveTo(23, -35);
       c.bezierCurveTo(28, -39, 34, -37, 39, -31);
       c.bezierCurveTo(43, -27, 44, -22, 41, -20);
       c.bezierCurveTo(38, -18, 34, -19, 31, -22);
       c.bezierCurveTo(28, -25, 23, -28, 23, -35);
       c.closePath();
+      c.restore();
     }
 
     // far legs
@@ -572,6 +576,8 @@
     var ftip = lockTip(FORE_A[0], FORE_A[1], FORE_A[2], 0.5, -1, Math.sin(tick / 7) * 1.5, vx, vy);
     paintLock(c, I.mane, FORE_A[0], FORE_A[1], ftip, FORE_A[2], FORE_A[3], 1, C.mane, -1);
 
+    // face (the head is a little bigger, so everything on it grows with it)
+    c.save(); c.translate(31, -28); c.scale(1.18, 1.18); c.translate(-31, 28);
     // ear
     c.fillStyle = bodyCol; c.strokeStyle = I.outline; c.lineWidth = 1.6;
     if (el === 'water') {                                                      // fin-shaped ear
@@ -583,36 +589,41 @@
       c.fillStyle = 'rgba(255,143,199,.7)';
       c.beginPath(); c.moveTo(24.5, -37); c.lineTo(24.6, -41.5); c.lineTo(27, -38); c.closePath(); c.fill();
     }
-    // eye: almond shape with a colored iris and a highlight
-    c.fillStyle = '#2a1f3d'; c.beginPath(); c.ellipse(32.5, -31.5, 2.8, 2.1, -0.2, 0, Math.PI * 2); c.fill();
-    c.fillStyle = I.outline; c.beginPath(); c.ellipse(32.7, -31.4, 1.9, 1.5, -0.2, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#1b1030'; c.beginPath(); c.ellipse(32.8, -31.4, 1.05, 1.05, 0, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#ffffff'; c.beginPath(); c.arc(33.5, -32.2, 0.7, 0, Math.PI * 2); c.fill();
-    c.strokeStyle = '#1b2a4a'; c.lineWidth = 0.9;
-    c.beginPath(); c.moveTo(29.8, -32.4); c.quadraticCurveTo(32.5, -34.6, 35.4, -33); c.stroke();
+    // a big sparkly eye with lashes
+    c.fillStyle = '#2a1f3d'; c.beginPath(); c.ellipse(32.6, -30.6, 3.5, 3.1, -0.15, 0, Math.PI * 2); c.fill();
+    c.fillStyle = I.outline; c.beginPath(); c.ellipse(32.8, -30.5, 2.6, 2.3, -0.15, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#1b1030'; c.beginPath(); c.arc(32.9, -30.4, 1.6, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffffff'; c.beginPath(); c.arc(33.9, -31.6, 1.2, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(31.8, -29.3, 0.6, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#1b2a4a'; c.lineWidth = 1; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(29.4, -32.2); c.quadraticCurveTo(32.5, -35.2, 36, -32.6);
+    c.moveTo(35.6, -33.2); c.lineTo(37.3, -34.5); c.moveTo(34.4, -34); c.lineTo(35.6, -35.6); c.stroke();
     if (el !== 'water' && el !== 'weather') {                                  // (water and weather have no eyebrows)
-      c.beginPath(); c.moveTo(30.2, -35.4); c.lineTo(34.6, -36.2); c.stroke();
+      c.beginPath(); c.moveTo(30.2, -37); c.lineTo(34.8, -37.8); c.stroke();
     }
-    // nose, mouth, cheek
+    // nose, a bigger smile, and rosy cheeks
     c.fillStyle = 'rgba(27,42,74,.6)'; c.beginPath(); c.ellipse(42.2, -24.6, 0.9, 1.5, 0.5, 0, Math.PI * 2); c.fill();
-    c.strokeStyle = 'rgba(27,42,74,.5)'; c.lineWidth = 0.9;
-    c.beginPath(); c.moveTo(41.6, -20.7); c.quadraticCurveTo(39.4, -19.7, 36.6, -21); c.stroke();
-    c.fillStyle = 'rgba(255,143,199,.35)'; c.beginPath(); c.arc(35, -26, 2.7, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgba(27,42,74,.55)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(41.6, -20.7); c.quadraticCurveTo(39.2, -18.6, 36.2, -20.8); c.stroke();
+    c.fillStyle = 'rgba(255,120,170,.5)'; c.beginPath(); c.arc(34.8, -25.2, 3.4, 0, Math.PI * 2); c.fill();
+    c.restore();
 
-    // crown
+
+    // crown and horn sit on the head
+    c.save(); c.translate(31, -28); c.scale(1.18, 1.18); c.translate(-31, 28);
     if (P.crown === 1) {
       c.fillStyle = '#ffd23d'; c.strokeStyle = '#e09f00'; c.lineWidth = 1;
       c.beginPath(); c.moveTo(21, -36); c.lineTo(21, -42); c.lineTo(24, -39); c.lineTo(26, -44); c.lineTo(28, -39); c.lineTo(31, -42); c.lineTo(31, -36);
       c.closePath(); c.fill(); c.stroke();
       c.fillStyle = '#ff5a6e'; c.beginPath(); c.arc(26, -38, 1.3, 0, Math.PI * 2); c.fill();
     }
-    // horn with spiral stripes
     c.fillStyle = hornCol; c.strokeStyle = 'rgba(27,42,74,.5)'; c.lineWidth = 1.4;
-    c.beginPath(); c.moveTo(28.5, -37.5); c.lineTo(38.5, -52); c.lineTo(32.5, -36.5); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(28.5, -37.5); c.lineTo(37, -49.5); c.lineTo(32.5, -36.5); c.closePath(); c.fill(); c.stroke();
     c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 1.2;
     [0.3, 0.55, 0.8].forEach(function (t) {
-      c.beginPath(); c.moveTo(28.5 + 10 * t, -37.5 - 14.5 * t); c.lineTo(32.5 + 6 * t, -36.5 - 15.5 * t); c.stroke();
+      c.beginPath(); c.moveTo(28.5 + 8.5 * t, -37.5 - 12 * t); c.lineTo(32.5 + 4.5 * t, -36.5 - 13 * t); c.stroke();
     });
+    c.restore();
     // ribbon bow
     if (P.ribbon === 1) {
       c.fillStyle = C.ribbon || '#ff8fc7'; c.strokeStyle = 'rgba(27,42,74,.4)'; c.lineWidth = 1;
@@ -622,7 +633,7 @@
     }
     // sparkles around the horn
     if (P.sparkle === 1) {
-      [[43, -55], [34, -56], [45, -46]].forEach(function (sp, i) {
+      [[42, -56], [33, -57], [44, -47]].forEach(function (sp, i) {
         var sz = 1.5 + 3.5 * Math.abs(Math.sin(tick / 8 + i * 2));
         c.fillStyle = '#fff7b0';
         c.beginPath();
@@ -1357,7 +1368,7 @@
   var shopCanvas = document.getElementById('shopCanvas'), sctx = shopCanvas.getContext('2d');
   var shopEl = 'ice', shopReturn = 'startScreen', shopOpen = false, chosenColor = null;
   var PALETTE = ['#ff5a6e', '#ff8fc7', '#ff9a3d', '#ffd23d', '#7be07b', '#3ddbd9', '#4aa8ff', '#b79cff', '#ffffff', '#c9c9d6', '#8a5a3c', '#1b2a4a'];
-  var SHOP_X = 195, SHOP_Y = 152, SHOP_SC = 2.8;
+  var SHOP_X = 195, SHOP_Y = 153, SHOP_SC = 2.7;
 
   function setColorMsg(t) { document.getElementById('colorMsg').textContent = t; }
 
@@ -1448,7 +1459,8 @@
   function partAt(x, y) {
     var mine = prizes[shopEl] || {}, i, a, tip;
     if (mine.ribbon === 1 && Math.sqrt((x - 15) * (x - 15) + (y + 22) * (y + 22)) < 8.5) return 'ribbon';
-    if (distSeg(x, y, 29.5, -38, 38, -51) < 5) return 'horn';
+    var h1 = hp(29.5, -38), h2 = hp(36.5, -48.5);
+    if (distSeg(x, y, h1[0], h1[1], h2[0], h2[1]) < 5.5) return 'horn';
     for (i = 0; i < MANE_A.length; i++) {
       a = MANE_A[i]; tip = lockTip(a[0], a[1], a[2], 0.35, 1, Math.sin(i * 0.8) * 2.5, 0, 0);
       if (distSeg(x, y, a[0], a[1], tip.x, tip.y) < a[3] + 3) return 'mane';
@@ -1456,8 +1468,8 @@
     tip = lockTip(FORE_A[0], FORE_A[1], FORE_A[2], 0.5, -1, 0, 0, 0);
     if (distSeg(x, y, FORE_A[0], FORE_A[1], tip.x, tip.y) < FORE_A[3] + 3) return 'mane';
     if (Math.sqrt((x + 1) * (x + 1) + (y + 1) * (y + 1)) < 7.5) return 'mark';
-    if (inE(x, y, 0, -1, 21, 10.5) || inE(x, y, 19, -19, 8.5, 17) || inE(x, y, 32, -28, 11.5, 8.5) ||
-        (x > 22 && x < 30 && y > -45 && y < -35) || (y > 4 && y < 30 && ((x > -20 && x < -4) || (x > 4 && x < 22)))) return 'body';
+    if (inE(x, y, 0, -1, 21, 10.5) || inE(x, y, 19, -19, 8.5, 17) || inE(x, y, 32.2, -28, 13.6, 10) ||
+        (x > 21 && x < 31 && y > -49 && y < -36) || (y > 4 && y < 30 && ((x > -20 && x < -4) || (x > 4 && x < 22)))) return 'body';
     for (i = 0; i < TAIL_A.length; i++) {
       a = TAIL_A[i]; tip = lockTip(a[0], a[1], a[2], 0.75, 1, Math.sin(i) * 4, 0, 0);
       if (distSeg(x, y, a[0], a[1], tip.x, tip.y) < a[3] + 3) return 'tail';
@@ -1574,7 +1586,7 @@
       var g = pctx.createLinearGradient(0, 0, 240, 0);
       g.addColorStop(0, I.bg[0]); g.addColorStop(1, I.bg[1]);
       pctx.fillStyle = g; pctx.fillRect(0, 0, 240, 140);
-      drawUnicorn(pctx, selected, 120, 92, 2.5, 0, 1.45);
+      drawUnicorn(pctx, selected, 120, 94, 2.5, 0, 1.4);
     }
     if (shopOpen) drawShop();
     drawRace();
