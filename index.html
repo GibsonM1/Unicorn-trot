@@ -76,26 +76,36 @@
   #resList { list-style: none; padding: 0; margin: 0; font-size: 1.2rem; min-width: 240px; }
   #resList li { padding: 6px 14px; border-radius: 12px; margin: 4px 0; background: rgba(255,255,255,.1); text-align: left; }
   #resList li.me { background: rgba(255,210,61,.3); font-weight: 700; }
-  /* touch controls: they float at the bottom of the screen while you are in a challenge */
+  /* touch controls: a joystick and a power button that float while you are in a challenge */
   #touchControls {
     display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
-    padding: 10px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+    padding: 10px 20px calc(14px + env(safe-area-inset-bottom, 0px));
     justify-content: space-between; align-items: flex-end; pointer-events: none;
   }
   body.show-touch #touchControls { display: flex; }
-  body.touch-device { padding-bottom: 190px; }
+  body.touch-device { padding-bottom: 180px; }
+  body.in-challenge { overflow: hidden; }
   #touchControls > * { pointer-events: auto; }
-  #pad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 64px); gap: 8px; }
-  #pad button, #powerBtn {
-    padding: 0; background: rgba(255,255,255,.88); user-select: none; -webkit-user-select: none;
-    -webkit-touch-callout: none; touch-action: none; box-shadow: 0 3px 10px rgba(0,0,0,.3);
+  /* nothing in the game can be selected, long-pressed, or zoomed by a double tap */
+  canvas, #touchControls, #touchControls * {
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent; touch-action: none;
   }
-  #pad button { font-size: 1.7rem; border-radius: 18px; }
-  #pad .up { grid-column: 2; grid-row: 1; }
-  #pad .left { grid-column: 1; grid-row: 2; }
-  #pad .down { grid-column: 2; grid-row: 2; }
-  #pad .right { grid-column: 3; grid-row: 2; }
-  #powerBtn { width: 92px; height: 92px; border-radius: 50%; font-size: 2.2rem; background: #ffd23d; }
+  #stick {
+    position: relative; width: 132px; height: 132px; border-radius: 50%;
+    background: rgba(255,255,255,.28); border: 3px solid rgba(255,255,255,.75);
+    box-shadow: 0 3px 12px rgba(0,0,0,.3);
+  }
+  #stickKnob {
+    position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px;
+    border-radius: 50%; background: rgba(255,255,255,.95); border: 3px solid var(--lilac);
+    display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+  }
+  #powerBtn {
+    width: 96px; height: 96px; border-radius: 50%; font-size: 2.2rem; padding: 0;
+    background: #ffd23d; border: 3px solid #ffffff; box-shadow: 0 3px 12px rgba(0,0,0,.3);
+  }
+  #powerBtn.pressed, #stick.active { filter: brightness(1.12); }
   .shopBox { background: rgba(255,255,255,.1); border-radius: 18px; padding: 14px; width: min(480px, 100%); display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .shopBox h3 { margin: 0; font-size: 1.2rem; }
   .shopBox p { margin: 0; font-size: 1rem; }
@@ -126,15 +136,10 @@
   </div>
 
   <div id="touchControls">
-    <div id="pad" aria-label="Arrow buttons">
-      <button id="padUp" class="up" aria-label="Up">⬆️</button>
-      <button id="padLeft" class="left" aria-label="Left">⬅️</button>
-      <button id="padDown" class="down" aria-label="Down">⬇️</button>
-      <button id="padRight" class="right" aria-label="Right">➡️</button>
-    </div>
-    <button id="powerBtn" aria-label="Use your power">✨</button>
+    <div id="stick" aria-label="Joystick"><div id="stickKnob">🦄</div></div>
+    <div id="powerBtn" role="button" aria-label="Use your power">✨</div>
   </div>
-  <div class="hint">Your unicorn runs by herself. When she reaches a challenge gate, the screen zooms in. Steer with the arrow keys, or on a tablet drag your finger on the screen or use the arrow buttons. Got a power? Press left and right together, or tap the ✨ button.</div>
+  <div class="hint">Your unicorn runs by herself. When she reaches a challenge gate, the screen zooms in. Steer with the arrow keys, or on a tablet drag your unicorn with your finger or use the joystick. Got a power? Press left and right together, or tap the ✨ button.</div>
 
   <div class="overlay" id="startScreen">
     <h2>Pick your unicorn</h2>
@@ -828,6 +833,8 @@
   function loseLife() {
     lives -= 1; ch.flash = 24; ch.invuln = 60;
     ch.uni.x = START.x; ch.uni.y = START.y; ch.uni.vx = 0; ch.uni.vy = 0;
+    // after losing a life she waits at the start under your finger, and moves again as soon as you move it
+    if (drag) { drag.ox = START.x - drag.px; drag.oy = START.y - drag.py; }
     sfxHit();
     updateHud();
     if (lives <= 0) {
@@ -853,7 +860,7 @@
     updateHud();
   }
 
-  // press left + right together: the closest danger goes away
+  // press left + right together: the closest danger goes away (on a tablet, the ✨ button)
   function usePower() {
     if (!powers[selected]) return;
     if (powerUses <= 0) { ch.msg = 'No power left this race!'; ch.msgT = 70; sfxDenied(); return; }
@@ -902,15 +909,25 @@
     if (both && !ch.latch) usePower();
     ch.latch = both;
 
-    var ax = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    var ay = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-    u.vx += ax * 0.5; u.vy += ay * 0.5;
-    if (ch.v.wind) u.vy += Math.sin(ch.age / 45) * D().wind;   // the wind pushes up and down
-    var fr = ch.v.friction || (selected === 'ice' ? D().iceF : I.friction);
-    u.vx *= fr; u.vy *= fr;
-    var sp = Math.sqrt(u.vx * u.vx + u.vy * u.vy);
-    if (sp > 5) { u.vx = u.vx / sp * 5; u.vy = u.vy / sp * 5; }
-    u.x += u.vx; u.y += u.vy;
+    if (drag) {
+      // dragging: she goes straight to your finger and stays under it
+      var lastX = u.x, lastY = u.y;
+      u.x += (drag.px + drag.ox - u.x) * 0.75;
+      u.y += (drag.py + drag.oy - u.y) * 0.75;
+      u.vx = u.x - lastX; u.vy = u.y - lastY;
+    } else {
+      var ax = (keys.right ? 1 : 0) - (keys.left ? 1 : 0) + stick.x;
+      var ay = (keys.down ? 1 : 0) - (keys.up ? 1 : 0) + stick.y;
+      if (ax > 1) ax = 1; if (ax < -1) ax = -1;
+      if (ay > 1) ay = 1; if (ay < -1) ay = -1;
+      u.vx += ax * 0.5; u.vy += ay * 0.5;
+      if (ch.v.wind) u.vy += Math.sin(ch.age / 45) * D().wind;   // the wind pushes up and down
+      var fr = ch.v.friction || (selected === 'ice' ? D().iceF : I.friction);
+      u.vx *= fr; u.vy *= fr;
+      var sp = Math.sqrt(u.vx * u.vx + u.vy * u.vy);
+      if (sp > 5) { u.vx = u.vx / sp * 5; u.vy = u.vy / sp * 5; }
+      u.x += u.vx; u.y += u.vy;
+    }
     if (u.x < u.r) { u.x = u.r; u.vx = 0; }
     if (u.y < LAKE.top + u.r) { u.y = LAKE.top + u.r; u.vy = 0; }
     if (u.y > LAKE.bottom - u.r) { u.y = LAKE.bottom - u.r; u.vy = 0; }
@@ -1546,60 +1563,102 @@
   ['sfxBtn', 'sfxBtn2'].forEach(function (id) { document.getElementById(id).addEventListener('click', toggleSfx); });
   paintSound();
 
-  // three ways to steer: keyboard, the arrow buttons, and dragging a finger on the screen
-  var srcKeys = { kb: {}, pad: {}, drag: {} };
-  function setKey(source, dir, on) {
-    srcKeys[source][dir] = on;
-    keys[dir] = !!(srcKeys.kb[dir] || srcKeys.pad[dir] || srcKeys.drag[dir]);
+  // ---------- steering ----------
+  // Three ways to steer, and all of them work at once:
+  //   * arrow keys
+  //   * the joystick (analog: a small push moves her slowly, a big push moves her fast)
+  //   * dragging her directly with a finger on the game, which follows your finger exactly
+  var stick = { x: 0, y: 0 };          // joystick push, each between -1 and 1
+  var drag = null;                     // finger dragging the unicorn
+  function clearTouchInput() {
+    stick.x = 0; stick.y = 0; drag = null;
+    knob.style.transform = '';
+    stickEl.classList.remove('active');
   }
-  function clearTouchKeys() {
-    ['left', 'right', 'up', 'down'].forEach(function (d) { srcKeys.pad[d] = false; srcKeys.drag[d] = false; keys[d] = !!srcKeys.kb[d]; });
-    dragging = null;
-  }
+
   var isTouch = ('ontouchstart' in window) || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
                 (typeof window.matchMedia === 'function' && window.matchMedia('(any-pointer: coarse)').matches);
   if (isTouch && document.body) document.body.classList.add('touch-device');
 
   var keyMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
   window.addEventListener('keydown', function (e) {
-    if (keyMap[e.key]) { setKey('kb', keyMap[e.key], true); if (state === 'challenge') e.preventDefault(); }
+    if (keyMap[e.key]) { keys[keyMap[e.key]] = true; if (state === 'challenge') e.preventDefault(); }
   });
-  window.addEventListener('keyup', function (e) { if (keyMap[e.key]) setKey('kb', keyMap[e.key], false); });
+  window.addEventListener('keyup', function (e) { if (keyMap[e.key]) keys[keyMap[e.key]] = false; });
 
-  [['padUp', 'up'], ['padLeft', 'left'], ['padDown', 'down'], ['padRight', 'right']].forEach(function (pr) {
-    var b = document.getElementById(pr[0]), d = pr[1];
-    b.addEventListener('pointerdown', function (e) { e.preventDefault(); setKey('pad', d, true); });
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { b.addEventListener(ev, function () { setKey('pad', d, false); }); });
-    b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  // stop the long-press menu, the text magnifier, and double-tap zoom on the game and the controls
+  function noSelect(el) {
+    if (!el || !el.addEventListener) return;
+    el.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+    el.addEventListener('touchmove', function (e) { e.preventDefault(); }, { passive: false });
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    el.addEventListener('selectstart', function (e) { e.preventDefault(); });
+    el.addEventListener('dragstart', function (e) { e.preventDefault(); });
+  }
+  var stickEl = document.getElementById('stick'), knob = document.getElementById('stickKnob');
+  var powerBtn = document.getElementById('powerBtn');
+  [stickEl, knob, powerBtn, document.getElementById('touchControls')].forEach(noSelect);
+  // on the game itself, only block touches during a challenge, so the page can still scroll elsewhere
+  canvas.addEventListener('touchstart', function (e) { if (state === 'challenge') e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchmove', function (e) { if (state === 'challenge') e.preventDefault(); }, { passive: false });
+  ['contextmenu', 'selectstart', 'dragstart'].forEach(function (ev) { canvas.addEventListener(ev, function (e) { e.preventDefault(); }); });
+  window.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+
+  // ---------- the joystick ----------
+  var stickId = null, R_STICK = 46;
+  function stickMove(e) {
+    var r = stickEl.getBoundingClientRect();
+    var dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d > R_STICK) { dx = dx / d * R_STICK; dy = dy / d * R_STICK; d = R_STICK; }
+    stick.x = dx / R_STICK; stick.y = dy / R_STICK;
+    if (Math.abs(stick.x) < 0.14) stick.x = 0;                       // a tiny wobble doesn't count
+    if (Math.abs(stick.y) < 0.14) stick.y = 0;
+    knob.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
+  }
+  stickEl.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); stickId = e.pointerId; stickEl.classList.add('active');
+    try { stickEl.setPointerCapture(e.pointerId); } catch (err) {}
+    stickMove(e);
   });
-  document.getElementById('powerBtn').addEventListener('pointerdown', function (e) {
-    e.preventDefault();
+  stickEl.addEventListener('pointermove', function (e) { if (e.pointerId === stickId) { e.preventDefault(); stickMove(e); } });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+    stickEl.addEventListener(ev, function (e) {
+      if (e.pointerId === stickId) { stickId = null; stick.x = 0; stick.y = 0; knob.style.transform = ''; stickEl.classList.remove('active'); }
+    });
+  });
+
+  // ---------- the power button ----------
+  powerBtn.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); powerBtn.classList.add('pressed');
     if (state === 'challenge' && ch && ch.age >= 18) usePower();
   });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+    powerBtn.addEventListener(ev, function () { powerBtn.classList.remove('pressed'); });
+  });
 
-  // drag a finger anywhere on the game to steer: the unicorn goes the way you drag
-  var dragging = null;
+  // ---------- drag the unicorn with a finger ----------
+  // Her position follows your finger one-to-one, so steering feels tight instead of floaty.
+  function canvasPos(e) {
+    var r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
+  }
   canvas.addEventListener('pointerdown', function (e) {
-    if (state !== 'challenge') return;
-    dragging = { id: e.pointerId, x: e.clientX, y: e.clientY };
-    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    if (state !== 'challenge' || !ch) return;
     e.preventDefault();
+    var p = canvasPos(e), dx = ch.uni.x - p.x, dy = ch.uni.y - p.y;
+    var grabbed = Math.sqrt(dx * dx + dy * dy) < 80;      // touched her: keep her where your finger holds her
+    drag = { id: e.pointerId, ox: grabbed ? dx : 0, oy: grabbed ? dy : 0, px: p.x, py: p.y };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   });
   canvas.addEventListener('pointermove', function (e) {
-    if (!dragging || e.pointerId !== dragging.id) return;
-    var dx = e.clientX - dragging.x, dy = e.clientY - dragging.y, T = 12, M = 45;
-    setKey('drag', 'left', dx < -T); setKey('drag', 'right', dx > T);
-    setKey('drag', 'up', dy < -T);   setKey('drag', 'down', dy > T);
-    if (Math.abs(dx) > M) dragging.x = e.clientX - (dx > 0 ? M : -M);        // the "stick" follows your finger
-    if (Math.abs(dy) > M) dragging.y = e.clientY - (dy > 0 ? M : -M);
+    if (!drag || e.pointerId !== drag.id) return;
+    e.preventDefault();
+    var p = canvasPos(e);
+    drag.px = p.x; drag.py = p.y;
   });
   ['pointerup', 'pointercancel'].forEach(function (ev) {
-    canvas.addEventListener(ev, function (e) {
-      if (dragging && e.pointerId === dragging.id) {
-        ['left', 'right', 'up', 'down'].forEach(function (d) { setKey('drag', d, false); });
-        dragging = null;
-      }
-    });
+    canvas.addEventListener(ev, function (e) { if (drag && e.pointerId === drag.id) drag = null; });
   });
 
   // ================= main loop =================
@@ -1621,12 +1680,17 @@
     drawRace();
     if (state === 'challenge' || state === 'out') { if (ch) drawChallenge(); }
     updateHud();
-    if (state !== lastState) { if (lastState === 'challenge') clearTouchKeys(); lastState = state; }
+    if (state !== lastState) { if (lastState === 'challenge') clearTouchInput(); lastState = state; }
     if (document.body) {
-      var showTouch = isTouch && state === 'challenge';
-      if (showTouch !== touchShown) { touchShown = showTouch; document.body.classList.toggle('show-touch', showTouch); }
+      var inCh = state === 'challenge';
+      var showTouch = isTouch && inCh;
+      if (showTouch !== touchShown) {
+        touchShown = showTouch;
+        document.body.classList.toggle('show-touch', showTouch);
+        document.body.classList.toggle('in-challenge', showTouch);
+      }
       var pbShow = showTouch && powers[selected] ? '' : 'none';
-      if (pbShow !== powerBtnShown) { powerBtnShown = pbShow; document.getElementById('powerBtn').style.display = pbShow; }
+      if (pbShow !== powerBtnShown) { powerBtnShown = pbShow; powerBtn.style.display = pbShow; }
     }
     requestAnimationFrame(loop);
   }
