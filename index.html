@@ -188,7 +188,7 @@
   var ELEMENTS = ['ice', 'water', 'fire', 'plant', 'weather'];
   var INFO = {
     ice:     { label: 'Ice',     emoji: '🧊', name: 'Glacier', body: '#f2fbff', legs: '#dff4ff', outline: '#8fd3f4', horn: '#b79cff', tail: '#8fd3f4', tail2: '#dff4ff', mane: 'ice',
-               lane: '#d6f1ff', bg: ['#c9ecff', '#8fd3f4'], bank: '#f7fdff', bankText: '#1b2a4a', hazard: 'crack', friction: 0.94, challenge: 'Melting lake' },
+               lane: '#d6f1ff', bg: ['#c9ecff', '#8fd3f4'], bank: '#f7fdff', bankText: '#1b2a4a', hazard: 'crack', friction: 0.92, challenge: 'Melting lake' },
     water:   { label: 'Water',   emoji: '💧', name: 'Ripple',  body: '#e6f4ff', legs: '#cfe6fb', outline: '#3a9be0', horn: '#7fd6e8', tail: '#3a9be0', tail2: '#8fe0f5', mane: 'waves',
                lane: '#cfe6ff', bg: ['#4a9be0', '#9fe3f5'], bank: '#2b5f9e', bankText: '#ffffff', hazard: 'rock', friction: 0.90, challenge: 'Waterfall climb' },
     fire:    { label: 'Fire',    emoji: '🔥', name: 'Blaze',   body: '#ffe9d6', legs: '#ffd4b0', outline: '#ff7a33', horn: '#ffcf3d', tail: '#ff7a33', tail2: '#ffcf3d', mane: 'flames',
@@ -570,10 +570,10 @@
       { name: 'Spark circle',   layout: 'orbit',   hazard: 'bolt', tip: 'Dodge the spinning sparks!' }
     ],
     weather: [
-      { name: 'Tornado flight', layout: 'columns', hazard: 'branch', wind: 0.16, tip: 'The wind pushes you! Dodge the branches!' },
+      { name: 'Tornado flight', layout: 'columns', hazard: 'branch', wind: 0.11, tip: 'The wind pushes you! Dodge the branches!' },
       { name: 'Branch shower',  layout: 'rain',    hazard: 'branch',             tip: 'Dodge the falling branches!' },
-      { name: 'Wind gates',     layout: 'walls',                     wind: 0.16, tip: 'The wind pushes you! Find the gap!' },
-      { name: 'Twister spin',   layout: 'orbit',   hazard: 'branch', wind: 0.16, tip: 'The wind pushes you! Dodge the spinning branches!' }
+      { name: 'Wind gates',     layout: 'walls',                     wind: 0.11, tip: 'The wind pushes you! Find the gap!' },
+      { name: 'Twister spin',   layout: 'orbit',   hazard: 'branch', wind: 0.11, tip: 'The wind pushes you! Dodge the spinning branches!' }
     ]
   };
   var WALLS = {
@@ -593,21 +593,21 @@
   function buildHazards(v, gi) {
     var list = [], k, x, r;
     if (v.layout === 'walls') {
-      var n = [3, 4, 4][gi], step = (700 - 200) / (n - 1), gapH = 130;
+      var n = [2, 3, 3][gi], step = (700 - 200) / (n - 1), gapH = 150;
       for (k = 0; k < n; k++) {
         list.push({ kind: 'wall', x: 200 + k * step, y: 250, r: 0, w: 34, gapH: gapH, vy: 0, mode: 'wall',
-                    ph: Math.random() * 6, sp: rnd(0.02, 0.034) * (Math.random() < 0.5 ? -1 : 1), amp: rnd(80, 125) });
+                    ph: Math.random() * 6, sp: rnd(0.016, 0.028) * (Math.random() < 0.5 ? -1 : 1), amp: rnd(70, 115) });
       }
     } else if (v.layout === 'rain') {
-      var cnt = [6, 8, 10][gi];
+      var cnt = [5, 6, 8][gi];
       for (k = 0; k < cnt; k++) {
         var h = mkHaz(rnd(170, 700), rnd(LAKE.top - 320, LAKE.bottom - 40), rnd(22, 30));
-        h.mode = 'rain'; h.vy = rnd(2.4, 3.8); list.push(h);
+        h.mode = 'rain'; h.vy = rnd(2.0, 3.2); list.push(h);
       }
     } else if (v.layout === 'orbit') {
-      var oc = [3, 3, 4][gi], ostep = (700 - 190) / (oc - 1);
+      var oc = [2, 3, 3][gi], ostep = (700 - 190) / (oc - 1);
       for (k = 0; k < oc; k++) {
-        var R = rnd(48, 60), cy = rnd(LAKE.top + R + 30, LAKE.bottom - R - 30), a0 = Math.random() * 6, w = rnd(0.03, 0.045) * (Math.random() < 0.5 ? -1 : 1);
+        var R = rnd(44, 54), cy = rnd(LAKE.top + R + 30, LAKE.bottom - R - 30), a0 = Math.random() * 6, w = rnd(0.025, 0.037) * (Math.random() < 0.5 ? -1 : 1);
         for (var q = 0; q < 2; q++) {
           var ho = mkHaz(190 + k * ostep, cy, rnd(22, 26));
           ho.mode = 'orbit'; ho.cx = 190 + k * ostep; ho.cy = cy; ho.R = R; ho.ang = a0 + q * Math.PI; ho.w = w;
@@ -616,7 +616,7 @@
         }
       }
     } else {
-      var cn = [5, 6, 7][gi], cstep = (700 - 170) / (cn - 1);
+      var cn = [4, 5, 6][gi], cstep = (700 - 170) / (cn - 1);
       for (k = 0; k < cn; k++) {
         x = 170 + k * cstep; r = rnd(28, 36);
         var roll = Math.random();
@@ -626,9 +626,9 @@
         } else if (roll < 0.6) {
           list.push(mkHaz(x, rnd(LAKE.top + r, LAKE.bottom - r), r));
         } else if (v.fall) {
-          var hf = mkHaz(x, rnd(LAKE.top, LAKE.bottom), r); hf.mode = 'fall'; hf.vy = rnd(1.5, 2.6); list.push(hf);
+          var hf = mkHaz(x, rnd(LAKE.top, LAKE.bottom), r); hf.mode = 'fall'; hf.vy = rnd(1.3, 2.2); list.push(hf);
         } else {
-          var hb = mkHaz(x, rnd(LAKE.top + r, LAKE.bottom - r), r); hb.mode = 'bounce'; hb.vy = (Math.random() < 0.5 ? -1 : 1) * rnd(1.2, 2.2); list.push(hb);
+          var hb = mkHaz(x, rnd(LAKE.top + r, LAKE.bottom - r), r); hb.mode = 'bounce'; hb.vy = (Math.random() < 0.5 ? -1 : 1) * rnd(1.0, 1.8); list.push(hb);
         }
       }
     }
@@ -701,7 +701,7 @@
         if (h.y - h.r > LAKE.bottom) h.y = LAKE.top - h.r;
       } else if (h.mode === 'rain') {
         h.y += h.vy;
-        if (h.y - h.r > LAKE.bottom) { h.y = LAKE.top - h.r - rnd(0, 120); h.x = rnd(170, 700); h.vy = rnd(2.4, 3.8); }
+        if (h.y - h.r > LAKE.bottom) { h.y = LAKE.top - h.r - rnd(0, 120); h.x = rnd(170, 700); h.vy = rnd(2.0, 3.2); }
       } else if (h.mode === 'orbit') {
         h.ang += h.w; h.x = h.cx + Math.cos(h.ang) * h.R; h.y = h.cy + Math.sin(h.ang) * h.R;
       } else if (h.mode === 'wall') {
@@ -739,7 +739,7 @@
         // the danger is a little smaller than it looks, so it feels fair
         if (h.kind === 'wall') {
           if (Math.abs(dx) < h.w / 2 + u.r * 0.6 && (u.y - u.r * 0.6 < h.y - h.gapH / 2 || u.y + u.r * 0.6 > h.y + h.gapH / 2)) { loseLife(); return; }
-        } else if (Math.sqrt(dx * dx + dy * dy) < h.r * 0.8 + u.r * 0.6) { loseLife(); return; }
+        } else if (Math.sqrt(dx * dx + dy * dy) < h.r * 0.7 + u.r * 0.6) { loseLife(); return; }
       }
     }
     if (u.x >= GOAL_X) winChallenge();
