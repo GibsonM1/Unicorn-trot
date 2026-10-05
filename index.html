@@ -187,10 +187,10 @@
   // ================= the five unicorns =================
   var ELEMENTS = ['ice', 'water', 'fire', 'plant', 'weather'];
   var INFO = {
-    ice:     { label: 'Ice',     emoji: '🧊', name: 'Glacier', body: '#f2fbff', legs: '#dff4ff', outline: '#8fd3f4', horn: '#b79cff', tail: '#8fd3f4', tail2: '#dff4ff', mane: 'ice',
+    ice:     { label: 'Ice',     emoji: '🧊', name: 'Glacier', body: '#f7fbff', legs: '#e6eefc', outline: '#9aa9e6', horn: '#b79cff', tail: '#8fd3f4', tail2: '#dff4ff', mane: 'ice',
                lane: '#d6f1ff', bg: ['#c9ecff', '#8fd3f4'], bank: '#f7fdff', bankText: '#1b2a4a', hazard: 'crack', friction: 0.92, challenge: 'Melting lake' },
-    water:   { label: 'Water',   emoji: '💧', name: 'Ripple',  body: '#e6f4ff', legs: '#cfe6fb', outline: '#3a9be0', horn: '#7fd6e8', tail: '#3a9be0', tail2: '#8fe0f5', mane: 'waves',
-               lane: '#cfe6ff', bg: ['#4a9be0', '#9fe3f5'], bank: '#2b5f9e', bankText: '#ffffff', hazard: 'rock', friction: 0.90, challenge: 'Waterfall climb' },
+    water:   { label: 'Water',   emoji: '💧', name: 'Ripple',  body: '#d9f7f2', legs: '#bfeee6', outline: '#1a8fa8', horn: '#3fe0cf', tail: '#3a9be0', tail2: '#8fe0f5', mane: 'waves',
+               lane: '#c9f3ee', bg: ['#27a9a6', '#8fe8dc'], bank: '#1d6f78', bankText: '#ffffff', hazard: 'rock', friction: 0.90, challenge: 'Waterfall climb' },
     fire:    { label: 'Fire',    emoji: '🔥', name: 'Blaze',   body: '#ffe9d6', legs: '#ffd4b0', outline: '#ff7a33', horn: '#ffcf3d', tail: '#ff7a33', tail2: '#ffcf3d', mane: 'flames',
                lane: '#ffd9c2', bg: ['#ffd7b0', '#ff9a5c'], bank: '#7a2e1f', bankText: '#ffffff', hazard: 'icicle', friction: 0.90, challenge: 'Ice wall jump' },
     plant:   { label: 'Plant',   emoji: '🌱', name: 'Sprout',  body: '#f0ffe6', legs: '#d9f2c8', outline: '#4caf50', horn: '#ff8fc7', tail: '#4caf50', tail2: '#9be37e', mane: 'vines',
@@ -412,8 +412,8 @@
       }
       return;
     }
-    if (style === 'ice') { fill = alt ? '#c9f0ff' : '#9bdcf7'; line = '#4aa6dd'; }
-    else if (style === 'waves') { fill = alt ? '#5ab8f0' : '#8fe0f5'; line = '#2f7fd1'; }
+    if (style === 'ice') { fill = alt ? '#f1f5ff' : '#c9d6ff'; line = '#8c9be0'; }
+    else if (style === 'waves') { fill = alt ? '#1f78d0' : '#2fd0c4'; line = '#0f4f9a'; }
     else if (style === 'flames') { fill = alt ? '#ff7a33' : '#ffcf3d'; }
     else { fill = alt ? '#4caf50' : '#6fcf6a'; line = '#2f8a3a'; }
     if (col) fill = alt ? col : lighten(col, 0.35);
@@ -426,7 +426,7 @@
     if (line) { c.strokeStyle = line; c.stroke(); }
     var mx = ax + (tip.x - ax) * 0.5, my = ay + (tip.y - ay) * 0.5;
     if (style === 'ice') {
-      c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(mx, my - 2.4); c.lineTo(mx + 1.6, my); c.lineTo(mx, my + 2.4); c.lineTo(mx - 1.6, my); c.closePath(); c.fill();
+      c.fillStyle = '#7d8fe8'; c.beginPath(); c.moveTo(mx, my - 2.4); c.lineTo(mx + 1.6, my); c.lineTo(mx, my + 2.4); c.lineTo(mx - 1.6, my); c.closePath(); c.fill();
     } else if (style === 'waves') {
       c.fillStyle = '#ffffff'; c.beginPath(); c.arc(mx, my, 1.5, 0, Math.PI * 2); c.fill();
     } else if (style === 'vines' && k % 3 === 0 && !col) {
@@ -553,9 +553,15 @@
 
     // ear, eye, nose, smile, cheek
     c.fillStyle = bodyCol; c.strokeStyle = I.outline; c.lineWidth = 1.8;
-    c.beginPath(); c.moveTo(19.5, -31); c.lineTo(20, -40); c.lineTo(25, -33); c.closePath(); c.fill(); c.stroke();
-    c.fillStyle = 'rgba(255,143,199,.7)';
-    c.beginPath(); c.moveTo(21, -33); c.lineTo(21.2, -37.5); c.lineTo(23.2, -34); c.closePath(); c.fill();
+    if (el === 'water') {                                                    // fin-shaped ear
+      c.fillStyle = '#2fd0c4';
+      c.beginPath(); c.moveTo(19, -31); c.lineTo(17.5, -37); c.lineTo(20.5, -35.5); c.lineTo(20.5, -42); c.lineTo(23.5, -36); c.lineTo(26.5, -39); c.lineTo(25.5, -32.5);
+      c.closePath(); c.fill(); c.stroke();
+    } else {
+      c.beginPath(); c.moveTo(19.5, -31); c.lineTo(20, -40); c.lineTo(25, -33); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = 'rgba(255,143,199,.7)';
+      c.beginPath(); c.moveTo(21, -33); c.lineTo(21.2, -37.5); c.lineTo(23.2, -34); c.closePath(); c.fill();
+    }
     c.fillStyle = '#1b2a4a'; c.beginPath(); c.ellipse(28.5, -27, 2.2, 2.7, 0, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#ffffff'; c.beginPath(); c.arc(29.2, -28, 0.9, 0, Math.PI * 2); c.fill();
     c.strokeStyle = '#1b2a4a'; c.lineWidth = 1;
