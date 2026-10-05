@@ -76,13 +76,26 @@
   #resList { list-style: none; padding: 0; margin: 0; font-size: 1.2rem; min-width: 240px; }
   #resList li { padding: 6px 14px; border-radius: 12px; margin: 4px 0; background: rgba(255,255,255,.1); text-align: left; }
   #resList li.me { background: rgba(255,210,61,.3); font-weight: 700; }
-  #pad { display: none; margin-top: 12px; grid-template-columns: repeat(3, 72px); grid-template-rows: repeat(2, 72px); gap: 8px; justify-content: center; }
-  #pad button { padding: 0; font-size: 1.8rem; background: rgba(255,255,255,.85); user-select: none; -webkit-user-select: none; touch-action: none; }
+  /* touch controls: they float at the bottom of the screen while you are in a challenge */
+  #touchControls {
+    display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    padding: 10px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+    justify-content: space-between; align-items: flex-end; pointer-events: none;
+  }
+  body.show-touch #touchControls { display: flex; }
+  body.touch-device { padding-bottom: 190px; }
+  #touchControls > * { pointer-events: auto; }
+  #pad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 64px); gap: 8px; }
+  #pad button, #powerBtn {
+    padding: 0; background: rgba(255,255,255,.88); user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none; touch-action: none; box-shadow: 0 3px 10px rgba(0,0,0,.3);
+  }
+  #pad button { font-size: 1.7rem; border-radius: 18px; }
   #pad .up { grid-column: 2; grid-row: 1; }
   #pad .left { grid-column: 1; grid-row: 2; }
   #pad .down { grid-column: 2; grid-row: 2; }
   #pad .right { grid-column: 3; grid-row: 2; }
-  @media (pointer: coarse) { #pad { display: grid; } }
+  #powerBtn { width: 92px; height: 92px; border-radius: 50%; font-size: 2.2rem; background: #ffd23d; }
   .shopBox { background: rgba(255,255,255,.1); border-radius: 18px; padding: 14px; width: min(480px, 100%); display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .shopBox h3 { margin: 0; font-size: 1.2rem; }
   .shopBox p { margin: 0; font-size: 1rem; }
@@ -112,13 +125,16 @@
     <canvas id="game" width="800" height="500" aria-label="Unicorn race"></canvas>
   </div>
 
-  <div id="pad" aria-label="Touch controls">
-    <button class="up" data-dir="up" aria-label="Up">⬆️</button>
-    <button class="left" data-dir="left" aria-label="Left">⬅️</button>
-    <button class="down" data-dir="down" aria-label="Down">⬇️</button>
-    <button class="right" data-dir="right" aria-label="Right">➡️</button>
+  <div id="touchControls">
+    <div id="pad" aria-label="Arrow buttons">
+      <button id="padUp" class="up" aria-label="Up">⬆️</button>
+      <button id="padLeft" class="left" aria-label="Left">⬅️</button>
+      <button id="padDown" class="down" aria-label="Down">⬇️</button>
+      <button id="padRight" class="right" aria-label="Right">➡️</button>
+    </div>
+    <button id="powerBtn" aria-label="Use your power">✨</button>
   </div>
-  <div class="hint">Your unicorn runs by herself. When she reaches a challenge gate, the screen zooms in. Steer with the arrow keys! Got a power? Press left and right together to use it.</div>
+  <div class="hint">Your unicorn runs by herself. When she reaches a challenge gate, the screen zooms in. Steer with the arrow keys, or on a tablet drag your finger on the screen or use the arrow buttons. Got a power? Press left and right together, or tap the ✨ button.</div>
 
   <div class="overlay" id="startScreen">
     <h2>Pick your unicorn</h2>
@@ -1099,7 +1115,7 @@
     ctx.fillText(I.emoji + ' ' + ch.v.name + '  (' + (ch.gate + 1) + ' of 3)', W / 2, 26);
     ctx.font = '600 18px Fredoka, "Trebuchet MS", sans-serif';
     var bottom = ch.v.tip;
-    if (powers[selected]) bottom = '✨ ' + powerUses + ' power' + (powerUses === 1 ? '' : 's') + ' left: press ⬅️ and ➡️ together';
+    if (powers[selected]) bottom = '✨ ' + powerUses + ' power' + (powerUses === 1 ? '' : 's') + ' left: ' + (isTouch ? 'tap the ✨ button' : 'press ⬅️ and ➡️ together');
     if (ch.msgT > 0) bottom = ch.msg;
     ctx.fillText(bottom, W / 2, H - 25);
 
@@ -1530,21 +1546,65 @@
   ['sfxBtn', 'sfxBtn2'].forEach(function (id) { document.getElementById(id).addEventListener('click', toggleSfx); });
   paintSound();
 
+  // three ways to steer: keyboard, the arrow buttons, and dragging a finger on the screen
+  var srcKeys = { kb: {}, pad: {}, drag: {} };
+  function setKey(source, dir, on) {
+    srcKeys[source][dir] = on;
+    keys[dir] = !!(srcKeys.kb[dir] || srcKeys.pad[dir] || srcKeys.drag[dir]);
+  }
+  function clearTouchKeys() {
+    ['left', 'right', 'up', 'down'].forEach(function (d) { srcKeys.pad[d] = false; srcKeys.drag[d] = false; keys[d] = !!srcKeys.kb[d]; });
+    dragging = null;
+  }
+  var isTouch = ('ontouchstart' in window) || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
+                (typeof window.matchMedia === 'function' && window.matchMedia('(any-pointer: coarse)').matches);
+  if (isTouch && document.body) document.body.classList.add('touch-device');
+
   var keyMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
   window.addEventListener('keydown', function (e) {
-    if (keyMap[e.key]) { keys[keyMap[e.key]] = true; if (state === 'challenge') e.preventDefault(); }
+    if (keyMap[e.key]) { setKey('kb', keyMap[e.key], true); if (state === 'challenge') e.preventDefault(); }
   });
-  window.addEventListener('keyup', function (e) { if (keyMap[e.key]) keys[keyMap[e.key]] = false; });
-  Array.prototype.forEach.call(document.querySelectorAll('#pad button'), function (b) {
-    var d = b.getAttribute('data-dir');
-    b.addEventListener('pointerdown', function (e) { e.preventDefault(); keys[d] = true; });
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
-      b.addEventListener(ev, function () { keys[d] = false; });
+  window.addEventListener('keyup', function (e) { if (keyMap[e.key]) setKey('kb', keyMap[e.key], false); });
+
+  [['padUp', 'up'], ['padLeft', 'left'], ['padDown', 'down'], ['padRight', 'right']].forEach(function (pr) {
+    var b = document.getElementById(pr[0]), d = pr[1];
+    b.addEventListener('pointerdown', function (e) { e.preventDefault(); setKey('pad', d, true); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { b.addEventListener(ev, function () { setKey('pad', d, false); }); });
+    b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  });
+  document.getElementById('powerBtn').addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    if (state === 'challenge' && ch && ch.age >= 18) usePower();
+  });
+
+  // drag a finger anywhere on the game to steer: the unicorn goes the way you drag
+  var dragging = null;
+  canvas.addEventListener('pointerdown', function (e) {
+    if (state !== 'challenge') return;
+    dragging = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    if (!dragging || e.pointerId !== dragging.id) return;
+    var dx = e.clientX - dragging.x, dy = e.clientY - dragging.y, T = 12, M = 45;
+    setKey('drag', 'left', dx < -T); setKey('drag', 'right', dx > T);
+    setKey('drag', 'up', dy < -T);   setKey('drag', 'down', dy > T);
+    if (Math.abs(dx) > M) dragging.x = e.clientX - (dx > 0 ? M : -M);        // the "stick" follows your finger
+    if (Math.abs(dy) > M) dragging.y = e.clientY - (dy > 0 ? M : -M);
+  });
+  ['pointerup', 'pointercancel'].forEach(function (ev) {
+    canvas.addEventListener(ev, function (e) {
+      if (dragging && e.pointerId === dragging.id) {
+        ['left', 'right', 'up', 'down'].forEach(function (d) { setKey('drag', d, false); });
+        dragging = null;
+      }
     });
   });
 
   // ================= main loop =================
   var last = performance.now();
+  var lastState = state, touchShown = false, powerBtnShown = null;
   function loop(now) {
     var dt = Math.min(0.05, (now - last) / 1000); last = now;
     tick++;
@@ -1561,6 +1621,13 @@
     drawRace();
     if (state === 'challenge' || state === 'out') { if (ch) drawChallenge(); }
     updateHud();
+    if (state !== lastState) { if (lastState === 'challenge') clearTouchKeys(); lastState = state; }
+    if (document.body) {
+      var showTouch = isTouch && state === 'challenge';
+      if (showTouch !== touchShown) { touchShown = showTouch; document.body.classList.toggle('show-touch', showTouch); }
+      var pbShow = showTouch && powers[selected] ? '' : 'none';
+      if (pbShow !== powerBtnShown) { powerBtnShown = pbShow; document.getElementById('powerBtn').style.display = pbShow; }
+    }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
