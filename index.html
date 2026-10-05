@@ -533,29 +533,103 @@
     player = racers.filter(function (r) { return r.isPlayer; })[0];
     countdown = 3.4; raceT = 0; finishCount = 0; gemsThisRace = 0; bannerText = ''; bannerUntil = 0;
     powerUses = POWER_USES; lsSet('unicornRace.lastEl', selected);
+    var pool = VARIANTS[selected].slice();                     // pick 3 of this unicorn's 4 challenges, in a random order
+    for (var i = pool.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp; }
+    raceVariants = pool.slice(0, 3);
   }
 
   // ================= the zoomed-in challenge =================
   var LAKE = { top: 50, bottom: H - 50 };
   var GOAL_X = W - 90, START = { x: 60, y: H / 2 };
   var ch = null;
+
+  // every unicorn has 4 different challenges. Each race picks 3 of them in a random order.
+  var VARIANTS = {
+    ice: [
+      { name: 'Melting lake',   layout: 'columns', hazard: 'crack',     tip: 'Slide across without touching the cracks!' },
+      { name: 'Icicle cave',    layout: 'rain',    hazard: 'icicle',    tip: 'Dodge the falling icicles!' },
+      { name: 'Frozen gates',   layout: 'walls',                        tip: 'Slip through the moving gaps!' },
+      { name: 'Snowflake spin', layout: 'orbit',   hazard: 'snowflake', tip: 'Dodge the spinning snowflakes!' }
+    ],
+    water: [
+      { name: 'Waterfall climb', layout: 'columns', hazard: 'rock', fall: true, tip: 'Swim up past the falling rocks!' },
+      { name: 'Rapids gates',    layout: 'walls',                              tip: 'Swim through the moving gaps!' },
+      { name: 'Whirlpool',       layout: 'orbit',   hazard: 'rock',           tip: 'Dodge the whirling rocks!' },
+      { name: 'Rock slide',      layout: 'rain',    hazard: 'rock',           tip: 'Dodge the tumbling rocks!' }
+    ],
+    fire: [
+      { name: 'Ice wall jump', layout: 'columns', hazard: 'icicle',    tip: 'Get past the sharp icicles!' },
+      { name: 'Icicle shower', layout: 'rain',    hazard: 'icicle',    tip: 'Dodge the falling icicles!' },
+      { name: 'Frost ring',    layout: 'orbit',   hazard: 'snowflake', tip: 'Dodge the spinning snowflakes!' },
+      { name: 'Frozen gates',  layout: 'walls',                        tip: 'Slip through the moving gaps!' }
+    ],
+    plant: [
+      { name: 'Storm dodge',    layout: 'columns', hazard: 'bolt', tip: 'Dodge the lightning bolts!' },
+      { name: 'Lightning rain', layout: 'rain',    hazard: 'bolt', tip: 'Dodge the falling lightning!' },
+      { name: 'Thunder gates',  layout: 'walls',                   tip: 'Slip through the moving gaps!' },
+      { name: 'Spark circle',   layout: 'orbit',   hazard: 'bolt', tip: 'Dodge the spinning sparks!' }
+    ],
+    weather: [
+      { name: 'Tornado flight', layout: 'columns', hazard: 'branch', wind: 0.16, tip: 'The wind pushes you! Dodge the branches!' },
+      { name: 'Branch shower',  layout: 'rain',    hazard: 'branch',             tip: 'Dodge the falling branches!' },
+      { name: 'Wind gates',     layout: 'walls',                     wind: 0.16, tip: 'The wind pushes you! Find the gap!' },
+      { name: 'Twister spin',   layout: 'orbit',   hazard: 'branch', wind: 0.16, tip: 'The wind pushes you! Dodge the spinning branches!' }
+    ]
+  };
+  var WALLS = {
+    ice:     { fill: '#cfeeff', edge: '#4aa6dd' },
+    water:   { fill: '#8a96a3', edge: '#4a5460' },
+    fire:    { fill: '#e4f7ff', edge: '#4aa6dd' },
+    plant:   { fill: '#59627a', edge: '#ffe14d' },
+    weather: { fill: '#9a6a3a', edge: '#5c3a1b' }
+  };
+  var raceVariants = [];
   var keys = { left: false, right: false, up: false, down: false };
 
   function rnd(a, b) { return a + Math.random() * (b - a); }
 
-  function buildHazards(el, gi) {
-    var list = [], n = [5, 6, 7][gi], step = (700 - 170) / (n - 1);
-    for (var k = 0; k < n; k++) {
-      var x = 170 + k * step, r = rnd(28, 36), roll = Math.random();
-      if (roll < 0.4) {
-        list.push({ x: x, y: rnd(LAKE.top + r, 185), r: r, vy: 0, mode: 'still', ph: Math.random() * 6 });
-        list.push({ x: x, y: rnd(315, LAKE.bottom - r), r: r, vy: 0, mode: 'still', ph: Math.random() * 6 });
-      } else if (roll < 0.6) {
-        list.push({ x: x, y: rnd(LAKE.top + r, LAKE.bottom - r), r: r, vy: 0, mode: 'still', ph: Math.random() * 6 });
-      } else if (el === 'water') {
-        list.push({ x: x, y: rnd(LAKE.top, LAKE.bottom), r: r, vy: rnd(1.5, 2.6), mode: 'fall', ph: 0 });
-      } else {
-        list.push({ x: x, y: rnd(LAKE.top + r, LAKE.bottom - r), r: r, vy: (Math.random() < 0.5 ? -1 : 1) * rnd(1.2, 2.2), mode: 'bounce', ph: Math.random() * 6 });
+  function mkHaz(x, y, r) { return { x: x, y: y, r: r, vy: 0, mode: 'still', ph: Math.random() * 6 }; }
+
+  function buildHazards(v, gi) {
+    var list = [], k, x, r;
+    if (v.layout === 'walls') {
+      var n = [3, 4, 4][gi], step = (700 - 200) / (n - 1), gapH = 130;
+      for (k = 0; k < n; k++) {
+        list.push({ kind: 'wall', x: 200 + k * step, y: 250, r: 0, w: 34, gapH: gapH, vy: 0, mode: 'wall',
+                    ph: Math.random() * 6, sp: rnd(0.02, 0.034) * (Math.random() < 0.5 ? -1 : 1), amp: rnd(80, 125) });
+      }
+    } else if (v.layout === 'rain') {
+      var cnt = [6, 8, 10][gi];
+      for (k = 0; k < cnt; k++) {
+        var h = mkHaz(rnd(170, 700), rnd(LAKE.top - 320, LAKE.bottom - 40), rnd(22, 30));
+        h.mode = 'rain'; h.vy = rnd(2.4, 3.8); list.push(h);
+      }
+    } else if (v.layout === 'orbit') {
+      var oc = [3, 3, 4][gi], ostep = (700 - 190) / (oc - 1);
+      for (k = 0; k < oc; k++) {
+        var R = rnd(48, 60), cy = rnd(LAKE.top + R + 30, LAKE.bottom - R - 30), a0 = Math.random() * 6, w = rnd(0.03, 0.045) * (Math.random() < 0.5 ? -1 : 1);
+        for (var q = 0; q < 2; q++) {
+          var ho = mkHaz(190 + k * ostep, cy, rnd(22, 26));
+          ho.mode = 'orbit'; ho.cx = 190 + k * ostep; ho.cy = cy; ho.R = R; ho.ang = a0 + q * Math.PI; ho.w = w;
+          ho.x = ho.cx + Math.cos(ho.ang) * R; ho.y = ho.cy + Math.sin(ho.ang) * R;
+          list.push(ho);
+        }
+      }
+    } else {
+      var cn = [5, 6, 7][gi], cstep = (700 - 170) / (cn - 1);
+      for (k = 0; k < cn; k++) {
+        x = 170 + k * cstep; r = rnd(28, 36);
+        var roll = Math.random();
+        if (roll < 0.4) {
+          list.push(mkHaz(x, rnd(LAKE.top + r, 185), r));
+          list.push(mkHaz(x, rnd(315, LAKE.bottom - r), r));
+        } else if (roll < 0.6) {
+          list.push(mkHaz(x, rnd(LAKE.top + r, LAKE.bottom - r), r));
+        } else if (v.fall) {
+          var hf = mkHaz(x, rnd(LAKE.top, LAKE.bottom), r); hf.mode = 'fall'; hf.vy = rnd(1.5, 2.6); list.push(hf);
+        } else {
+          var hb = mkHaz(x, rnd(LAKE.top + r, LAKE.bottom - r), r); hb.mode = 'bounce'; hb.vy = (Math.random() < 0.5 ? -1 : 1) * rnd(1.2, 2.2); list.push(hb);
+        }
       }
     }
     return list;
@@ -564,7 +638,7 @@
   function startChallenge(gi) {
     state = 'challenge';
     ch = { gate: gi, uni: { x: START.x, y: START.y, vx: 0, vy: 0, r: 16 },
-           hazards: buildHazards(selected, gi), invuln: 0, flash: 0, age: 0, fx: [], msg: '', msgT: 0, latch: false };
+           v: raceVariants[gi], hazards: buildHazards(raceVariants[gi], gi), invuln: 0, flash: 0, age: 0, fx: [], msg: '', msgT: 0, latch: false };
     sfxZoom();
     updateHud();
   }
@@ -625,6 +699,14 @@
       } else if (h.mode === 'fall') {
         h.y += h.vy;
         if (h.y - h.r > LAKE.bottom) h.y = LAKE.top - h.r;
+      } else if (h.mode === 'rain') {
+        h.y += h.vy;
+        if (h.y - h.r > LAKE.bottom) { h.y = LAKE.top - h.r - rnd(0, 120); h.x = rnd(170, 700); h.vy = rnd(2.4, 3.8); }
+      } else if (h.mode === 'orbit') {
+        h.ang += h.w; h.x = h.cx + Math.cos(h.ang) * h.R; h.y = h.cy + Math.sin(h.ang) * h.R;
+      } else if (h.mode === 'wall') {
+        h.ph += h.sp - 0.05;       // (undo the shared 0.05 so each gap keeps its own speed)
+        h.y = 250 + h.amp * Math.sin(h.ph);
       }
     });
     if (ch.invuln > 0) ch.invuln--;
@@ -641,7 +723,9 @@
     var ax = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
     var ay = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
     u.vx += ax * 0.5; u.vy += ay * 0.5;
-    u.vx *= I.friction; u.vy *= I.friction;
+    if (ch.v.wind) u.vy += Math.sin(ch.age / 45) * ch.v.wind;   // the wind pushes up and down
+    var fr = ch.v.friction || I.friction;
+    u.vx *= fr; u.vy *= fr;
     var sp = Math.sqrt(u.vx * u.vx + u.vy * u.vy);
     if (sp > 5) { u.vx = u.vx / sp * 5; u.vy = u.vy / sp * 5; }
     u.x += u.vx; u.y += u.vy;
@@ -653,7 +737,9 @@
       for (var i = 0; i < ch.hazards.length; i++) {
         var h = ch.hazards[i], dx = u.x - h.x, dy = u.y - h.y;
         // the danger is a little smaller than it looks, so it feels fair
-        if (Math.sqrt(dx * dx + dy * dy) < h.r * 0.8 + u.r * 0.6) { loseLife(); return; }
+        if (h.kind === 'wall') {
+          if (Math.abs(dx) < h.w / 2 + u.r * 0.6 && (u.y - u.r * 0.6 < h.y - h.gapH / 2 || u.y + u.r * 0.6 > h.y + h.gapH / 2)) { loseLife(); return; }
+        } else if (Math.sqrt(dx * dx + dy * dy) < h.r * 0.8 + u.r * 0.6) { loseLife(); return; }
       }
     }
     if (u.x >= GOAL_X) winChallenge();
@@ -691,6 +777,17 @@
       ctx.beginPath();
       pts.forEach(function (p, i) { if (i) ctx.lineTo(p[0] * r * 1.1, p[1] * r * 1.1); else ctx.moveTo(p[0] * r * 1.1, p[1] * r * 1.1); });
       ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (type === 'snowflake') {
+      ctx.rotate(h.ph * 0.6); ctx.lineCap = 'round';
+      [[7, '#2b6cb0'], [3, '#ffffff']].forEach(function (st) {
+        ctx.strokeStyle = st[1]; ctx.lineWidth = st[0];
+        for (var a = 0; a < 6; a++) {
+          ctx.save(); ctx.rotate(a * Math.PI / 3);
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(r * 0.95, 0);
+          ctx.moveTo(r * 0.55, 0); ctx.lineTo(r * 0.8, r * 0.28); ctx.moveTo(r * 0.55, 0); ctx.lineTo(r * 0.8, -r * 0.28);
+          ctx.stroke(); ctx.restore();
+        }
+      });
     } else {
       ctx.rotate(h.ph);
       ctx.strokeStyle = '#6b4423'; ctx.lineWidth = 7; ctx.lineCap = 'round';
@@ -700,6 +797,18 @@
       ctx.fillStyle = '#4caf50'; ctx.beginPath(); ctx.ellipse(r * 0.9, 0, 6, 3.5, 0, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
+  }
+
+  function drawWall(w, el) {
+    var C = WALLS[el], gt = w.y - w.gapH / 2, gb = w.y + w.gapH / 2, x0 = w.x - w.w / 2;
+    ctx.fillStyle = C.fill; ctx.strokeStyle = C.edge; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.fillRect(x0, LAKE.top, w.w, gt - LAKE.top); ctx.strokeRect(x0, LAKE.top, w.w, gt - LAKE.top);
+    ctx.fillRect(x0, gb, w.w, LAKE.bottom - gb); ctx.strokeRect(x0, gb, w.w, LAKE.bottom - gb);
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x0 + 9, LAKE.top + 6); ctx.lineTo(x0 + 9, gt - 6);
+    ctx.moveTo(x0 + 9, gb + 6); ctx.lineTo(x0 + 9, LAKE.bottom - 6);
+    ctx.stroke();
   }
 
   function drawFx(f) {
@@ -803,7 +912,17 @@
     ctx.fillStyle = 'rgba(255,255,255,.35)';
     ctx.fillRect(0, LAKE.top, 30, LAKE.bottom - LAKE.top);
 
-    ch.hazards.forEach(function (h) { drawHazard(I.hazard, h); });
+    if (ch.v.wind) {                                   // wind streaks
+      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      for (var wi = 0; wi < 6; wi++) {
+        var wx = (ch.age * 6 + wi * 150) % (W + 100) - 50, wy = LAKE.top + 35 + wi * 62;
+        ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + 40, wy + Math.sin(ch.age / 45) * 14); ctx.stroke();
+      }
+    }
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, LAKE.top, W, LAKE.bottom - LAKE.top); ctx.clip();   // falling things come in from the top
+    ch.hazards.forEach(function (h) { if (h.kind === 'wall') drawWall(h, selected); else drawHazard(ch.v.hazard, h); });
+    ctx.restore();
 
     var blink = ch.invuln > 0 && Math.floor(ch.invuln / 6) % 2 === 0;
     if (!blink) drawUnicorn(ctx, selected, ch.uni.x, ch.uni.y, ch.uni.vx, ch.uni.vy, 1.1);
@@ -811,9 +930,9 @@
 
     ctx.fillStyle = I.bankText; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.font = '700 22px Fredoka, "Trebuchet MS", sans-serif';
-    ctx.fillText(I.emoji + ' ' + I.challenge + '  (' + (ch.gate + 1) + ' of 3)', W / 2, 26);
+    ctx.fillText(I.emoji + ' ' + ch.v.name + '  (' + (ch.gate + 1) + ' of 3)', W / 2, 26);
     ctx.font = '600 18px Fredoka, "Trebuchet MS", sans-serif';
-    var bottom = 'Steer with the arrow keys. Don\u2019t touch the dangers!';
+    var bottom = ch.v.tip;
     if (powers[selected]) bottom = '✨ ' + powerUses + ' power' + (powerUses === 1 ? '' : 's') + ' left: press ⬅️ and ➡️ together';
     if (ch.msgT > 0) bottom = ch.msg;
     ctx.fillText(bottom, W / 2, H - 25);
