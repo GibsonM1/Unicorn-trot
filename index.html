@@ -8,12 +8,11 @@
 <style>
   :root {
     --night: #1b2a4a;
-    --lake: #8fd3f4;
     --frost: #f2fbff;
     --lilac: #b79cff;
     --pink: #ff8fc7;
     --gem: #3ddbd9;
-    --danger: #ff5a6e;
+    --gold: #ffd23d;
     box-sizing: border-box;
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -26,33 +25,41 @@
     color: var(--frost);
     font-family: "Fredoka", "Trebuchet MS", "Comic Sans MS", sans-serif;
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    display: flex; flex-direction: column; align-items: center;
     padding: 12px;
   }
-  h1 { margin: 4px 0 8px; font-size: clamp(1.6rem, 5vw, 2.4rem); letter-spacing: .5px; }
+  h1 { margin: 4px 0 8px; font-size: clamp(1.6rem, 5vw, 2.4rem); }
   #hud {
     width: 100%; max-width: 820px;
     display: flex; justify-content: space-between; align-items: center;
-    gap: 8px; font-size: 1.2rem; font-weight: 600; margin-bottom: 8px;
+    gap: 8px; font-size: 1.15rem; font-weight: 600; margin-bottom: 8px; flex-wrap: wrap;
   }
-  .pill { background: rgba(255,255,255,.14); border-radius: 999px; padding: 6px 16px; }
-  #stage { position: relative; width: 100%; max-width: 820px; }
-  canvas {
+  .pill { background: rgba(255,255,255,.14); border-radius: 999px; padding: 6px 16px; color: var(--frost); }
+  #muteBtn { font-size: 1.1rem; padding: 6px 14px; background: rgba(255,255,255,.14); color: var(--frost); }
+  #stage { width: 100%; max-width: 820px; }
+  canvas#game {
     width: 100%; height: auto; display: block;
     border-radius: 20px; border: 4px solid var(--frost);
-    background: var(--lake); touch-action: none;
+    background: #1b2a4a; touch-action: none;
   }
   .overlay {
-    position: absolute; inset: 0; border-radius: 20px;
-    background: rgba(27,42,74,.82);
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: fixed; inset: 0; z-index: 10; overflow-y: auto;
+    background: rgba(27,42,74,.94);
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
     gap: 12px; text-align: center; padding: 20px;
   }
+  .overlay > :first-child { margin-top: auto; }
+  .overlay > :last-child { margin-bottom: auto; }
   .overlay.hidden { display: none; }
   .overlay h2 { margin: 0; font-size: clamp(1.5rem, 5vw, 2.2rem); }
-  .overlay p { margin: 0; max-width: 34ch; font-size: 1.1rem; }
+  .overlay p { margin: 0; max-width: 36ch; font-size: 1.1rem; }
+  #preview { width: 240px; height: 140px; border-radius: 18px; border: 3px solid var(--frost); }
+  .picker { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 460px; }
+  .pick {
+    font-size: 1rem; padding: 8px 14px; background: rgba(255,255,255,.15); color: var(--frost);
+    border: 3px solid transparent;
+  }
+  .pick.sel { border-color: var(--pink); background: rgba(255,255,255,.3); }
   input[type=text] {
     font: inherit; font-size: 1.3rem; text-align: center;
     padding: 10px 16px; border-radius: 14px; border: 3px solid var(--lilac);
@@ -66,6 +73,9 @@
   button.secondary { background: var(--frost); }
   button:hover { filter: brightness(1.08); }
   button:focus-visible, input:focus-visible { outline: 4px solid var(--gem); outline-offset: 3px; }
+  #resList { list-style: none; padding: 0; margin: 0; font-size: 1.2rem; min-width: 240px; }
+  #resList li { padding: 6px 14px; border-radius: 12px; margin: 4px 0; background: rgba(255,255,255,.1); text-align: left; }
+  #resList li.me { background: rgba(255,210,61,.3); font-weight: 700; }
   #pad { display: none; margin-top: 12px; grid-template-columns: repeat(3, 72px); grid-template-rows: repeat(2, 72px); gap: 8px; justify-content: center; }
   #pad button { padding: 0; font-size: 1.8rem; background: rgba(255,255,255,.85); user-select: none; -webkit-user-select: none; touch-action: none; }
   #pad .up { grid-column: 2; grid-row: 1; }
@@ -73,7 +83,7 @@
   #pad .down { grid-column: 2; grid-row: 2; }
   #pad .right { grid-column: 3; grid-row: 2; }
   @media (pointer: coarse) { #pad { display: grid; } }
-  .hint { opacity: .8; font-size: .95rem; margin-top: 8px; text-align: center; }
+  .hint { opacity: .85; font-size: .95rem; margin-top: 8px; text-align: center; max-width: 52ch; }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -81,33 +91,14 @@
   <h1>🦄 Unicorn Race</h1>
 
   <div id="hud">
-    <div class="pill" id="nameTag">Glacier</div>
+    <div class="pill" id="nameTag">🧊 Glacier</div>
     <div class="pill" id="lives">❤️ 10</div>
     <div class="pill" id="gems">💎 0</div>
+    <button id="muteBtn" aria-label="Turn sound on or off">🔊</button>
   </div>
 
   <div id="stage">
-    <canvas id="game" width="800" height="500" aria-label="Melting lake challenge"></canvas>
-
-    <div class="overlay" id="startScreen">
-      <h2>🧊 Ice Unicorn</h2>
-      <p>Name your unicorn, then slide across the melting lake. Don't touch the cracks!</p>
-      <input type="text" id="nameInput" maxlength="14" value="Glacier" aria-label="Unicorn name">
-      <button id="startBtn">Start the race</button>
-    </div>
-
-    <div class="overlay hidden" id="winScreen">
-      <h2>🎉 You made it across!</h2>
-      <p id="winText">+5 gems</p>
-      <button id="againBtn">Race again</button>
-    </div>
-
-    <div class="overlay hidden" id="outScreen">
-      <h2>💔 Out of lives</h2>
-      <p id="outText"></p>
-      <button id="rejoinBtn">Spend 20 💎 to rejoin</button>
-      <button id="sitBtn" class="secondary">Sit out, play the next race</button>
-    </div>
+    <canvas id="game" width="800" height="500" aria-label="Unicorn race"></canvas>
   </div>
 
   <div id="pad" aria-label="Touch controls">
@@ -116,69 +107,671 @@
     <button class="down" data-dir="down" aria-label="Down">⬇️</button>
     <button class="right" data-dir="right" aria-label="Right">➡️</button>
   </div>
-  <div class="hint">Use the arrow keys to steer. Ice is slippery!</div>
+  <div class="hint">Your unicorn runs by herself. When she reaches a challenge gate, the screen zooms in. Steer with the arrow keys!</div>
+
+  <div class="overlay" id="startScreen">
+    <h2>Pick your unicorn</h2>
+    <canvas id="preview" width="240" height="140"></canvas>
+    <div class="picker" id="picker"></div>
+    <input type="text" id="nameInput" maxlength="14" value="Glacier" aria-label="Unicorn name">
+    <button id="startBtn">Start the race</button>
+  </div>
+
+  <div class="overlay hidden" id="outScreen">
+    <h2>💔 Out of lives</h2>
+    <p id="outText"></p>
+    <button id="rejoinBtn">Spend 20 💎 to rejoin</button>
+    <button id="sitBtn" class="secondary">Sit out this race</button>
+  </div>
+
+  <div class="overlay hidden" id="resultsScreen">
+    <h2 id="resTitle"></h2>
+    <ol id="resList"></ol>
+    <p id="resGems"></p>
+    <button id="raceAgainBtn">Race again</button>
+  </div>
 
 <script>
 (function () {
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
+  var pcanvas = document.getElementById('preview');
+  var pctx = pcanvas.getContext('2d');
   var W = canvas.width, H = canvas.height;
 
-  var START_LIVES = 10;
-  var REJOIN_COST = 20;
-  var REJOIN_LIVES = 5;   // placeholder until the designer decides
+  // ================= the five unicorns =================
+  var ELEMENTS = ['ice', 'water', 'fire', 'plant', 'weather'];
+  var INFO = {
+    ice:     { label: 'Ice',     emoji: '🧊', name: 'Glacier', body: '#f2fbff', legs: '#dff4ff', outline: '#8fd3f4', horn: '#b79cff', tail: '#8fd3f4', tail2: '#dff4ff', mane: 'ice',
+               lane: '#d6f1ff', bg: ['#c9ecff', '#8fd3f4'], bank: '#f7fdff', bankText: '#1b2a4a', hazard: 'crack', friction: 0.94, challenge: 'Melting lake' },
+    water:   { label: 'Water',   emoji: '💧', name: 'Ripple',  body: '#e6f4ff', legs: '#cfe6fb', outline: '#3a9be0', horn: '#7fd6e8', tail: '#3a9be0', tail2: '#8fe0f5', mane: 'waves',
+               lane: '#cfe6ff', bg: ['#4a9be0', '#9fe3f5'], bank: '#2b5f9e', bankText: '#ffffff', hazard: 'rock', friction: 0.90, challenge: 'Waterfall climb' },
+    fire:    { label: 'Fire',    emoji: '🔥', name: 'Blaze',   body: '#ffe9d6', legs: '#ffd4b0', outline: '#ff7a33', horn: '#ffcf3d', tail: '#ff7a33', tail2: '#ffcf3d', mane: 'flames',
+               lane: '#ffd9c2', bg: ['#ffd7b0', '#ff9a5c'], bank: '#7a2e1f', bankText: '#ffffff', hazard: 'icicle', friction: 0.90, challenge: 'Ice wall jump' },
+    plant:   { label: 'Plant',   emoji: '🌱', name: 'Sprout',  body: '#f0ffe6', legs: '#d9f2c8', outline: '#4caf50', horn: '#ff8fc7', tail: '#4caf50', tail2: '#9be37e', mane: 'vines',
+               lane: '#d8f5c9', bg: ['#6f7c93', '#364259'], bank: '#232c3d', bankText: '#ffffff', hazard: 'bolt', friction: 0.90, challenge: 'Storm dodge' },
+    weather: { label: 'Weather', emoji: '🌦️', name: 'Gust',    body: '#f4f1ff', legs: '#e3def7', outline: '#9aa5d6', horn: '#ffd23d', tail: '#cfd6ff', tail2: '#ffffff', mane: 'clouds',
+               lane: '#e3e0f5', bg: ['#c3cdf0', '#7e8bc4'], bank: '#8c97d1', bankText: '#ffffff', hazard: 'branch', friction: 0.90, challenge: 'Tornado flight' }
+  };
+
+  // ================= saving in the browser =================
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+
+  // ================= rules =================
+  var GATES = [0.25, 0.5, 0.75];     // where the challenges are on the track
   var GEMS_PER_CHALLENGE = 5;
+  var GEMS_FIRST = 5, GEMS_SECOND = 2;
+  var REJOIN_COST = 20;
+  var REJOIN_LIVES = 5;               // placeholder until the designer decides
 
-  var state = 'menu';     // menu | playing | won | out
-  var lives = START_LIVES;
-  var gems = 0;
+  var selected = 'ice';
   var unicornName = 'Glacier';
+  var lives = 10;
+  var gems = parseInt(lsGet('unicornRace.gems') || '0', 10) || 0;
+  var muted = lsGet('unicornRace.muted') === '1';
 
-  // ---- saving gems in the browser (safe if storage is empty or blocked) ----
-  function loadGems() {
-    try { var v = localStorage.getItem('unicornRace.gems'); return v ? parseInt(v, 10) || 0 : 0; }
-    catch (e) { return 0; }
+  // first 5 races = 10 lives. After that: do better, get fewer lives. Do worse, get more.
+  function computeStartLives() {
+    var games = parseInt(lsGet('unicornRace.games') || '0', 10) || 0;
+    if (games < 5) return 10;
+    var recent;
+    try { recent = JSON.parse(lsGet('unicornRace.recent') || '[]'); } catch (e) { recent = []; }
+    if (!recent.length) return 10;
+    var sum = 0; recent.forEach(function (p) { sum += p; });
+    var avg = sum / recent.length;
+    return Math.min(10, 2 + 2 * Math.round(avg));
   }
-  function saveGems() {
-    try { localStorage.setItem('unicornRace.gems', String(gems)); } catch (e) {}
+  function saveResultHistory(place) {
+    var games = (parseInt(lsGet('unicornRace.games') || '0', 10) || 0) + 1;
+    lsSet('unicornRace.games', games);
+    var recent;
+    try { recent = JSON.parse(lsGet('unicornRace.recent') || '[]'); } catch (e) { recent = []; }
+    recent.push(place);
+    lsSet('unicornRace.recent', JSON.stringify(recent.slice(-3)));
   }
-  gems = loadGems();
 
-  // ---- the unicorn ----
-  var uni = { x: 60, y: H / 2, vx: 0, vy: 0, r: 16 };
-  var START = { x: 60, y: H / 2 };
-  var invulnerable = 0;   // frames of safety after a hit
-  var flash = 0;
+  // ================= sound: music + effects (made with the browser, no files) =================
+  var AC = null, master, musicGain, sfxGain, noiseBuf = null;
+  var STEP = 0.1;                       // one music step in seconds (fast and exciting)
+  var BASS = [45, 41, 48, 43];          // A, F, C, G
+  var ARP = [[69, 72, 76], [65, 69, 72], [72, 76, 79], [67, 71, 74]];
+  var musicStep = 0, nextNoteTime = 0, musicTimer = null;
 
-  // ---- the melting lake ----
+  function mtof(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+
+  function tone(freq, start, dur, type, vol, slideTo, dest) {
+    var o = AC.createOscillator(), g = AC.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, start);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, start + dur);
+    g.gain.setValueAtTime(vol, start);
+    g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    o.connect(g); g.connect(dest || sfxGain);
+    o.start(start); o.stop(start + dur + 0.03);
+  }
+  function noise(start, dur, vol, hp) {
+    var s = AC.createBufferSource(); s.buffer = noiseBuf;
+    var f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+    var g = AC.createGain();
+    g.gain.setValueAtTime(vol, start);
+    g.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    s.connect(f); f.connect(g); g.connect(musicGain);
+    s.start(start); s.stop(start + dur + 0.03);
+  }
+  function playStep(step, t) {
+    var bar = Math.floor(step / 16) % 4, s = step % 16;
+    if (s % 2 === 0) {                                  // bouncy bass
+      var n = BASS[bar] + (s % 4 === 2 ? 12 : 0);
+      tone(mtof(n), t, STEP * 1.8, 'square', 0.07, null, musicGain);
+    }
+    if (s % 4 === 0) tone(150, t, 0.12, 'sine', 0.35, 45, musicGain);   // drum
+    if (s === 4 || s === 12) noise(t, 0.09, 0.16, 1500);                // snare
+    if (s % 2 === 1) noise(t, 0.03, 0.05, 7000);                        // hi-hat
+    var chord = ARP[bar];
+    var note = chord[[0, 1, 2, 1][s % 4]] + (s >= 8 && s % 4 === 3 ? 12 : 0);
+    tone(mtof(note), t, STEP * 0.9, 'square', 0.035, null, musicGain);  // sparkly racing notes
+  }
+  function startMusic() {
+    if (musicTimer || !AC) return;
+    nextNoteTime = AC.currentTime + 0.1;
+    musicTimer = setInterval(function () {
+      while (nextNoteTime < AC.currentTime + 0.2) {
+        playStep(musicStep, nextNoteTime);
+        nextNoteTime += STEP;
+        musicStep = (musicStep + 1) % 64;
+      }
+    }, 30);
+  }
+  function initAudio() {
+    if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; return; }
+    master = AC.createGain(); master.gain.value = muted ? 0 : 1; master.connect(AC.destination);
+    musicGain = AC.createGain(); musicGain.gain.value = 0.5; musicGain.connect(master);
+    sfxGain = AC.createGain(); sfxGain.gain.value = 0.9; sfxGain.connect(master);
+    var len = AC.sampleRate;
+    noiseBuf = AC.createBuffer(1, len, AC.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    startMusic();
+  }
+  function sfxHit() {                   // bow, bow, bow!
+    if (!AC) return; var t = AC.currentTime;
+    [330, 262, 196].forEach(function (f, i) { tone(f, t + i * 0.15, 0.14, 'sawtooth', 0.3, f * 0.7); });
+  }
+  function sfxGem() {
+    if (!AC) return; var t = AC.currentTime;
+    tone(988, t, 0.1, 'sine', 0.3); tone(1319, t + 0.09, 0.18, 'sine', 0.3);
+  }
+  function sfxChallengeWin() {
+    if (!AC) return; var t = AC.currentTime;
+    [523, 659, 784, 1047].forEach(function (f, i) { tone(f, t + i * 0.09, 0.18, 'triangle', 0.3); });
+  }
+  function sfxCount(go) {
+    if (!AC) return; var t = AC.currentTime;
+    if (go) tone(880, t, 0.45, 'square', 0.25); else tone(440, t, 0.2, 'square', 0.2);
+  }
+  function sfxZoom() {
+    if (!AC) return; var t = AC.currentTime;
+    tone(300, t, 0.3, 'sine', 0.25, 900);
+  }
+  function sfxFinish(place) {
+    if (!AC) return; var t = AC.currentTime;
+    var notes = place <= 2 ? [523, 659, 784, 1047, 1319] : [392, 330];
+    notes.forEach(function (f, i) { tone(f, t + i * 0.12, 0.22, 'square', 0.2); });
+  }
+  function sfxOut() {
+    if (!AC) return; var t = AC.currentTime;
+    [392, 330, 262, 196].forEach(function (f, i) { tone(f, t + i * 0.2, 0.2, 'triangle', 0.3); });
+  }
+
+  // ================= drawing the unicorns =================
+  var tick = 0;
+
+  function maneSeg(c, style, px, py, s, k) {
+    c.lineWidth = 1.5;
+    if (style === 'ice') {
+      c.fillStyle = '#c9f0ff'; c.strokeStyle = '#4aa6dd';
+      c.beginPath(); c.moveTo(px, py - s); c.lineTo(px + s * 0.7, py); c.lineTo(px, py + s); c.lineTo(px - s * 0.7, py);
+      c.closePath(); c.fill(); c.stroke();
+    } else if (style === 'waves') {
+      c.fillStyle = k % 2 ? '#5ab8f0' : '#8fe0f5'; c.strokeStyle = '#2f7fd1';
+      c.beginPath(); c.arc(px, py, s * 1.1, 0, Math.PI * 2); c.fill(); c.stroke();
+    } else if (style === 'flames') {
+      c.fillStyle = k % 2 ? '#ff7a33' : '#ffcf3d';
+      c.beginPath(); c.moveTo(px - s * 0.8, py + s * 0.4);
+      c.quadraticCurveTo(px - s * 0.9, py - s * 0.4, px, py - s * 1.7);
+      c.quadraticCurveTo(px + s * 0.9, py - s * 0.4, px + s * 0.8, py + s * 0.4);
+      c.closePath(); c.fill();
+    } else if (style === 'vines') {
+      if (k % 3 === 0) {
+        c.fillStyle = '#ff8fc7'; c.beginPath(); c.arc(px, py, s * 1.1, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#ffe14d'; c.beginPath(); c.arc(px, py, s * 0.45, 0, Math.PI * 2); c.fill();
+      } else {
+        c.fillStyle = '#5cc15f'; c.strokeStyle = '#2f8a3a';
+        c.beginPath(); c.ellipse(px, py, s * 1.4, s * 0.8, 0.6, 0, Math.PI * 2); c.fill(); c.stroke();
+      }
+    } else {
+      c.fillStyle = '#ffffff'; c.strokeStyle = '#c7cff0';
+      c.beginPath(); c.arc(px, py, s * 1.25, 0, Math.PI * 2); c.fill(); c.stroke();
+    }
+  }
+
+  function drawUnicorn(c, el, x, y, vx, vy, scale) {
+    var I = INFO[el];
+    var speed = Math.sqrt(vx * vx + vy * vy);
+    var trot = Math.sin(tick / 4) * Math.min(speed, 4) * 1.6;
+    c.save(); c.translate(x, y); c.scale(scale, scale);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+
+    // mane strands trail behind the head and swing as she moves
+    for (var b = 0; b < 3; b++) {
+      for (var j = 1; j <= 7; j++) {
+        var bx = 8 - j * 6.5 - vx * j * 1.4;
+        var by = -12 + b * 6 + j * 1.2 + Math.sin(tick / 9 + j * 0.7 + b) * 2 - vy * j * 1.4;
+        maneSeg(c, I.mane, bx, by, Math.max(2.2, 4.4 - j * 0.25), j + b);
+      }
+    }
+    // tail
+    [[I.tail, 5], [I.tail2, 2.2]].forEach(function (t) {
+      c.strokeStyle = t[0]; c.lineWidth = t[1];
+      c.beginPath(); c.moveTo(-17, 2);
+      c.quadraticCurveTo(-30 - vx * 2, 6 + Math.sin(tick / 8) * 3 - vy * 2, -34 - vx * 3, 14 - vy * 3);
+      c.stroke();
+    });
+    // legs
+    c.strokeStyle = I.legs; c.lineWidth = 5;
+    [[-10, 1], [-5, -1], [8, -1], [13, 1]].forEach(function (l) {
+      c.beginPath(); c.moveTo(l[0], 8); c.lineTo(l[0] + trot * l[1], 19); c.stroke();
+    });
+    // body, neck, head
+    c.fillStyle = I.body; c.strokeStyle = I.outline; c.lineWidth = 2;
+    c.beginPath(); c.ellipse(0, 3, 18, 10, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.beginPath(); c.ellipse(13, -5, 7, 10, 0.5, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.beginPath(); c.ellipse(21, -11, 9, 6.5, 0.25, 0, Math.PI * 2); c.fill(); c.stroke();
+    // ear, eye, cheek
+    c.beginPath(); c.moveTo(14, -16); c.lineTo(16, -23); c.lineTo(19, -16); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#1b2a4a'; c.beginPath(); c.arc(23, -12, 1.8, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,143,199,.7)'; c.beginPath(); c.arc(20, -8, 2.4, 0, Math.PI * 2); c.fill();
+    // horn
+    c.fillStyle = I.horn; c.strokeStyle = 'rgba(27,42,74,.45)'; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(22, -16); c.lineTo(33, -30); c.lineTo(26, -14); c.closePath(); c.fill(); c.stroke();
+    // the weather unicorn wears a lightning bolt
+    if (el === 'weather') {
+      c.fillStyle = '#ffd23d'; c.strokeStyle = '#e09f00'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(2, -4); c.lineTo(-5, 5); c.lineTo(-1, 5); c.lineTo(-4, 12); c.lineTo(5, 2); c.lineTo(1, 2);
+      c.closePath(); c.fill(); c.stroke();
+    }
+    c.restore();
+  }
+
+  // ================= the race =================
+  var TX0 = 100, TX1 = 720, LANE_Y0 = 60, LANE_H = 76;
+  var racers = [], player = null, state = 'menu';
+  var countdown = 0, raceT = 0, finishCount = 0, finishTimer = 0, gemsThisRace = 0;
+  var bannerText = '', bannerUntil = 0;
+
+  function ordinal(n) { return ['1st', '2nd', '3rd', '4th', '5th'][n - 1]; }
+
+  function rank() {
+    return racers.slice().sort(function (a, b) {
+      if (a.out !== b.out) return a.out ? 1 : -1;
+      if (a.finished && b.finished) return a.finishIdx - b.finishIdx;
+      if (a.finished) return -1;
+      if (b.finished) return 1;
+      return b.p - a.p;
+    });
+  }
+
+  function setupRace() {
+    racers = ELEMENTS.map(function (el, i) {
+      var isP = el === selected;
+      return { el: el, name: isP ? unicornName : INFO[el].name, p: 0, lane: i,
+               speed: isP ? 0.034 : 0.031 + Math.random() * 0.006,
+               finished: false, finishIdx: -1, pausedUntil: 0, gatesDone: 0, isPlayer: isP, out: false };
+    });
+    player = racers.filter(function (r) { return r.isPlayer; })[0];
+    countdown = 3.4; raceT = 0; finishCount = 0; gemsThisRace = 0; bannerText = ''; bannerUntil = 0;
+  }
+
+  // ================= the zoomed-in challenge =================
   var LAKE = { top: 50, bottom: H - 50 };
-  var GOAL_X = W - 90;
-
-  // cracks: some stay still, some slide up and down
-  var cracks = [];
-  function buildCracks() {
-    cracks = [
-      { x: 190, y: 150, r: 34, vy: 0 },
-      { x: 190, y: 360, r: 34, vy: 0 },
-      { x: 300, y: 255, r: 40, vy: 1.2 },
-      { x: 420, y: 120, r: 36, vy: 0 },
-      { x: 420, y: 380, r: 36, vy: 0 },
-      { x: 530, y: 200, r: 38, vy: -1.6 },
-      { x: 530, y: 320, r: 38, vy: 1.6 },
-      { x: 640, y: 255, r: 42, vy: 1.0 }
-    ];
-  }
-  buildCracks();
-
-  // ---- keyboard + touch controls ----
+  var GOAL_X = W - 90, START = { x: 60, y: H / 2 };
+  var ch = null;
   var keys = { left: false, right: false, up: false, down: false };
+
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  function buildHazards(el, gi) {
+    var list = [], n = [5, 6, 7][gi], step = (700 - 170) / (n - 1);
+    for (var k = 0; k < n; k++) {
+      var x = 170 + k * step, r = rnd(28, 36), roll = Math.random();
+      if (roll < 0.4) {
+        list.push({ x: x, y: rnd(LAKE.top + r, 185), r: r, vy: 0, mode: 'still', ph: Math.random() * 6 });
+        list.push({ x: x, y: rnd(315, LAKE.bottom - r), r: r, vy: 0, mode: 'still', ph: Math.random() * 6 });
+      } else if (roll < 0.6) {
+        list.push({ x: x, y: rnd(LAKE.top + r, LAKE.bottom - r), r: r, vy: 0, mode: 'still', ph: Math.random() * 6 });
+      } else if (el === 'water') {
+        list.push({ x: x, y: rnd(LAKE.top, LAKE.bottom), r: r, vy: rnd(1.5, 2.6), mode: 'fall', ph: 0 });
+      } else {
+        list.push({ x: x, y: rnd(LAKE.top + r, LAKE.bottom - r), r: r, vy: (Math.random() < 0.5 ? -1 : 1) * rnd(1.2, 2.2), mode: 'bounce', ph: Math.random() * 6 });
+      }
+    }
+    return list;
+  }
+
+  function startChallenge(gi) {
+    state = 'challenge';
+    ch = { gate: gi, uni: { x: START.x, y: START.y, vx: 0, vy: 0, r: 16 },
+           hazards: buildHazards(selected, gi), invuln: 0, flash: 0, age: 0 };
+    sfxZoom();
+    updateHud();
+  }
+
+  function loseLife() {
+    lives -= 1; ch.flash = 24; ch.invuln = 60;
+    ch.uni.x = START.x; ch.uni.y = START.y; ch.uni.vx = 0; ch.uni.vy = 0;
+    sfxHit();
+    updateHud();
+    if (lives <= 0) {
+      state = 'out'; sfxOut();
+      var can = gems >= REJOIN_COST;
+      document.getElementById('rejoinBtn').style.display = can ? '' : 'none';
+      document.getElementById('outText').textContent = can
+        ? unicornName + ' is out of the race. You have ' + gems + ' gems, so you can spend ' + REJOIN_COST + ' to jump back in.'
+        : unicornName + ' sits out the rest of this race, but you get to play the next one.';
+      document.getElementById('sitBtn').textContent = can ? 'No thanks, sit out this race' : 'Okay';
+      show('outScreen');
+    }
+  }
+
+  function winChallenge() {
+    player.gatesDone += 1;
+    gems += GEMS_PER_CHALLENGE; gemsThisRace += GEMS_PER_CHALLENGE;
+    lsSet('unicornRace.gems', gems);
+    sfxChallengeWin(); setTimeout(sfxGem, 380);
+    bannerText = '+' + GEMS_PER_CHALLENGE + ' 💎  Challenge ' + player.gatesDone + ' beaten!';
+    bannerUntil = raceT + 2.2;
+    ch = null; state = 'race';
+    updateHud();
+  }
+
+  function updateChallenge() {
+    ch.age++;
+    var u = ch.uni, I = INFO[selected];
+    ch.hazards.forEach(function (h) {
+      h.ph += 0.05;
+      if (h.mode === 'bounce') {
+        h.y += h.vy;
+        if (h.y - h.r < LAKE.top || h.y + h.r > LAKE.bottom) h.vy = -h.vy;
+      } else if (h.mode === 'fall') {
+        h.y += h.vy;
+        if (h.y - h.r > LAKE.bottom) h.y = LAKE.top - h.r;
+      }
+    });
+    if (ch.invuln > 0) ch.invuln--;
+    if (ch.flash > 0) ch.flash--;
+    if (ch.age < 18) return;   // wait for the zoom-in to finish
+
+    var ax = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    var ay = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    u.vx += ax * 0.5; u.vy += ay * 0.5;
+    u.vx *= I.friction; u.vy *= I.friction;
+    var sp = Math.sqrt(u.vx * u.vx + u.vy * u.vy);
+    if (sp > 5) { u.vx = u.vx / sp * 5; u.vy = u.vy / sp * 5; }
+    u.x += u.vx; u.y += u.vy;
+    if (u.x < u.r) { u.x = u.r; u.vx = 0; }
+    if (u.y < LAKE.top + u.r) { u.y = LAKE.top + u.r; u.vy = 0; }
+    if (u.y > LAKE.bottom - u.r) { u.y = LAKE.bottom - u.r; u.vy = 0; }
+
+    if (ch.invuln === 0) {
+      for (var i = 0; i < ch.hazards.length; i++) {
+        var h = ch.hazards[i], dx = u.x - h.x, dy = u.y - h.y;
+        // the danger is a little smaller than it looks, so it feels fair
+        if (Math.sqrt(dx * dx + dy * dy) < h.r * 0.8 + u.r * 0.6) { loseLife(); return; }
+      }
+    }
+    if (u.x >= GOAL_X) winChallenge();
+  }
+
+  function drawHazard(type, h) {
+    ctx.save(); ctx.translate(h.x, h.y);
+    var r = h.r;
+    if (type === 'crack') {
+      ctx.fillStyle = '#16356b';
+      ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.78, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#e8f7ff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      for (var a = 0; a < 6; a++) {
+        var ang = a * Math.PI / 3 + r;
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(ang) * r * 0.7, Math.sin(ang) * r * 0.6);
+        ctx.lineTo(Math.cos(ang + 0.3) * r * 1.25, Math.sin(ang + 0.3) * r * 1.05);
+        ctx.stroke();
+      }
+    } else if (type === 'rock') {
+      ctx.fillStyle = '#7b8794'; ctx.strokeStyle = '#4a5460'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#aab4c0'; ctx.beginPath(); ctx.arc(-r * 0.3, -r * 0.3, r * 0.28, 0, Math.PI * 2); ctx.fill();
+    } else if (type === 'icicle') {
+      ctx.fillStyle = '#e4f7ff'; ctx.strokeStyle = '#4aa6dd'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+      [-1, 0, 1].forEach(function (k) {
+        var len = k === 0 ? r * 1.15 : r * 0.85;
+        ctx.beginPath(); ctx.moveTo(k * r * 0.55 - r * 0.3, -r * 0.9); ctx.lineTo(k * r * 0.55 + r * 0.3, -r * 0.9);
+        ctx.lineTo(k * r * 0.55, -r * 0.9 + len * 1.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+      });
+    } else if (type === 'bolt') {
+      ctx.globalAlpha = 0.75 + 0.25 * Math.sin(h.ph * 6);
+      ctx.fillStyle = '#ffe14d'; ctx.strokeStyle = '#e09f00'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+      var pts = [[0.25, -1], [-0.55, 0.1], [0, 0.1], [-0.25, 1], [0.6, -0.2], [0.05, -0.2]];
+      ctx.beginPath();
+      pts.forEach(function (p, i) { if (i) ctx.lineTo(p[0] * r * 1.1, p[1] * r * 1.1); else ctx.moveTo(p[0] * r * 1.1, p[1] * r * 1.1); });
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.rotate(h.ph);
+      ctx.strokeStyle = '#6b4423'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-r * 0.9, 0); ctx.lineTo(r * 0.9, 0); ctx.stroke();
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(-r * 0.2, 0); ctx.lineTo(-r * 0.5, -r * 0.55); ctx.moveTo(r * 0.3, 0); ctx.lineTo(r * 0.55, r * 0.5); ctx.stroke();
+      ctx.fillStyle = '#4caf50'; ctx.beginPath(); ctx.ellipse(r * 0.9, 0, 6, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawChallenge() {
+    var I = INFO[selected];
+    var sc = Math.min(1, 0.3 + ch.age / 18 * 0.7);
+    ctx.save();
+    ctx.translate(W / 2, H / 2); ctx.scale(sc, sc); ctx.translate(-W / 2, -H / 2);
+    ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+
+    var g = ctx.createLinearGradient(0, 0, W, 0);
+    g.addColorStop(0, I.bg[0]); g.addColorStop(1, I.bg[1]);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = I.bank;
+    ctx.fillRect(0, 0, W, LAKE.top); ctx.fillRect(0, LAKE.bottom, W, H - LAKE.bottom);
+
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+    for (var i = 0; i < 9; i++) {
+      var sx = 60 + i * 85, sy = 90 + (i * 53) % 330;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + 30, sy - 8); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(183,156,255,.45)';
+    ctx.fillRect(GOAL_X, LAKE.top, W - GOAL_X, LAKE.bottom - LAKE.top);
+    ctx.font = '44px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🏁', GOAL_X + 45, H / 2);
+    ctx.fillStyle = 'rgba(255,255,255,.35)';
+    ctx.fillRect(0, LAKE.top, 30, LAKE.bottom - LAKE.top);
+
+    ch.hazards.forEach(function (h) { drawHazard(I.hazard, h); });
+
+    var blink = ch.invuln > 0 && Math.floor(ch.invuln / 6) % 2 === 0;
+    if (!blink) drawUnicorn(ctx, selected, ch.uni.x, ch.uni.y, ch.uni.vx, ch.uni.vy, 1.1);
+
+    ctx.fillStyle = I.bankText; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '700 22px Fredoka, "Trebuchet MS", sans-serif';
+    ctx.fillText(I.emoji + ' ' + I.challenge + '  (' + (ch.gate + 1) + ' of 3)', W / 2, 26);
+    ctx.font = '600 18px Fredoka, "Trebuchet MS", sans-serif';
+    ctx.fillText('Steer with the arrow keys. Don\u2019t touch the dangers!', W / 2, H - 25);
+
+    if (ch.flash > 0) {
+      ctx.fillStyle = 'rgba(255,90,110,' + (ch.flash / 24 * 0.5) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.restore();
+  }
+
+  function drawRace() {
+    ctx.fillStyle = '#1b2a4a'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+    // top message
+    ctx.font = '700 26px Fredoka, "Trebuchet MS", sans-serif';
+    var top;
+    if (bannerUntil > raceT && bannerText) { ctx.fillStyle = '#ffd23d'; top = bannerText; }
+    else if (state === 'countdown') { ctx.fillStyle = '#f2fbff'; top = 'Get ready!'; }
+    else if (player) {
+      ctx.fillStyle = '#f2fbff';
+      top = player.out ? 'Sitting out this race' : '🏁 You are in ' + ordinal(rank().indexOf(player) + 1) + ' place';
+    } else { top = ''; }
+    ctx.fillText(top, W / 2, 30);
+
+    // lanes
+    for (var i = 0; i < 5; i++) {
+      var el = ELEMENTS[i], I = INFO[el], y0 = LANE_Y0 + i * LANE_H;
+      ctx.fillStyle = I.lane; ctx.fillRect(40, y0 + 3, W - 80, LANE_H - 6);
+      ctx.font = '22px serif'; ctx.fillStyle = '#1b2a4a';
+      ctx.fillText(I.emoji, 22, y0 + LANE_H / 2);
+      // challenge gates
+      GATES.forEach(function (gt, gi) {
+        var gx = TX0 + (TX1 - TX0) * gt;
+        ctx.strokeStyle = 'rgba(27,42,74,.45)'; ctx.lineWidth = 3; ctx.setLineDash([6, 6]);
+        ctx.beginPath(); ctx.moveTo(gx, y0 + 6); ctx.lineTo(gx, y0 + LANE_H - 6); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = '16px serif'; ctx.fillText('⚠️', gx, y0 + 12);
+      });
+      // finish line
+      for (var q = 0; q < 7; q++) {
+        ctx.fillStyle = (q % 2) ? '#1b2a4a' : '#ffffff';
+        ctx.fillRect(TX1 + 14, y0 + 6 + q * 9, 9, 9);
+        ctx.fillStyle = (q % 2) ? '#ffffff' : '#1b2a4a';
+        ctx.fillRect(TX1 + 23, y0 + 6 + q * 9, 9, 9);
+      }
+      if (player && I === INFO[player.el]) {
+        ctx.strokeStyle = '#ffd23d'; ctx.lineWidth = 4;
+        ctx.strokeRect(40, y0 + 3, W - 80, LANE_H - 6);
+      }
+    }
+
+    // unicorns (player on top)
+    racers.slice().sort(function (a, b) { return (a.isPlayer ? 1 : 0) - (b.isPlayer ? 1 : 0); }).forEach(function (r) {
+      var x = TX0 + (TX1 - TX0) * r.p, y = LANE_Y0 + r.lane * LANE_H + LANE_H / 2 + 4;
+      var waiting = r.out || r.finished || (r.pausedUntil > raceT) || (r.isPlayer && (state === 'challenge' || state === 'out')) || state === 'countdown';
+      if (!(r.out)) drawUnicorn(ctx, r.el, x, y, waiting ? 0 : 3, 0, 0.8);
+      if (!r.finished && !r.out && (r.pausedUntil > raceT || (r.isPlayer && (state === 'challenge' || state === 'out')))) {
+        ctx.font = '18px serif'; ctx.fillStyle = '#1b2a4a'; ctx.fillText('💭', x + 4, y - 30);
+      }
+    });
+
+    // names under the track
+    ctx.font = '600 15px Fredoka, "Trebuchet MS", sans-serif'; ctx.fillStyle = '#c7d3f5';
+    ctx.fillText('Challenge gates ⚠️ are where the screen zooms in', W / 2, H - 28);
+
+    if (state === 'countdown') {
+      var n = Math.ceil(countdown);
+      var label = n >= 1 && n <= 3 ? String(n) : 'GO!';
+      ctx.font = '700 120px Fredoka, "Trebuchet MS", sans-serif';
+      ctx.lineWidth = 10; ctx.strokeStyle = '#1b2a4a'; ctx.strokeText(label, W / 2, H / 2);
+      ctx.fillStyle = '#ffd23d'; ctx.fillText(label, W / 2, H / 2);
+    }
+  }
+
+  // ================= update loop =================
+  function update(dt) {
+    if (state === 'menu' || state === 'results') return;
+    if (state === 'countdown') {
+      var prev = Math.ceil(countdown);
+      countdown -= dt;
+      var cur = Math.ceil(countdown);
+      if (cur !== prev && cur >= 1 && cur <= 3) sfxCount(false);
+      if (countdown <= 0) { sfxCount(true); state = 'race'; }
+      return;
+    }
+    raceT += dt;
+    racers.forEach(function (r) {
+      if (r.finished || r.out) return;
+      if (r.isPlayer && (state === 'challenge' || state === 'out')) return;
+      if (r.pausedUntil > raceT) return;
+      r.p += r.speed * dt;
+      if (r.gatesDone < 3 && r.p >= GATES[r.gatesDone]) {
+        r.p = GATES[r.gatesDone];
+        if (r.isPlayer) startChallenge(r.gatesDone);
+        else { r.gatesDone++; r.pausedUntil = raceT + 5 + Math.random() * 5; }   // robots take 5 to 10 seconds
+        return;
+      }
+      if (r.p >= 1) {
+        r.p = 1; r.finished = true; r.finishIdx = finishCount++;
+        if (r.isPlayer) { state = 'finishing'; finishTimer = 1.4; sfxFinish(r.finishIdx + 1); }
+      }
+    });
+    if (state === 'challenge') updateChallenge();
+    if (state === 'finishing') { finishTimer -= dt; if (finishTimer <= 0) showResults(); }
+  }
+
+  function showResults() {
+    var order = rank();
+    var place = order.indexOf(player) + 1;
+    var placeGems = place === 1 ? GEMS_FIRST : (place === 2 ? GEMS_SECOND : 0);
+    gems += placeGems; lsSet('unicornRace.gems', gems);
+    saveResultHistory(place);
+    state = 'results';
+    document.getElementById('resTitle').textContent = player.out
+      ? 'You sat out this race'
+      : (place === 1 ? '🏆 You won!' : 'You came ' + ordinal(place) + '!');
+    var list = document.getElementById('resList'); list.innerHTML = '';
+    order.forEach(function (r, i) {
+      var li = document.createElement('li');
+      li.textContent = ordinal(i + 1) + '  ' + INFO[r.el].emoji + ' ' + r.name + (r.isPlayer ? '  (you)' : '');
+      if (r.isPlayer) li.className = 'me';
+      list.appendChild(li);
+    });
+    document.getElementById('resGems').textContent =
+      '+' + gemsThisRace + ' 💎 from challenges' + (placeGems ? ', +' + placeGems + ' 💎 for ' + ordinal(place) + ' place' : '') +
+      '. You now have ' + gems + ' 💎';
+    updateHud();
+    show('resultsScreen');
+  }
+
+  // ================= screens, buttons, controls =================
+  function show(id) { document.getElementById(id).classList.remove('hidden'); }
+  function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+  var hudCache = '';
+  function updateHud() {
+    var s = INFO[selected].emoji + ' ' + unicornName + '|❤️ ' + lives + '|💎 ' + gems;
+    if (s === hudCache) return; hudCache = s;
+    document.getElementById('nameTag').textContent = INFO[selected].emoji + ' ' + unicornName;
+    document.getElementById('lives').textContent = '❤️ ' + lives;
+    document.getElementById('gems').textContent = '💎 ' + gems;
+  }
+
+  var picker = document.getElementById('picker');
+  var nameInput = document.getElementById('nameInput');
+  ELEMENTS.forEach(function (el) {
+    var b = document.createElement('button');
+    b.className = 'pick' + (el === selected ? ' sel' : '');
+    b.textContent = INFO[el].emoji + ' ' + INFO[el].label;
+    b.addEventListener('click', function () {
+      var wasDefault = nameInput.value.trim() === INFO[selected].name || nameInput.value.trim() === '';
+      selected = el;
+      if (wasDefault) nameInput.value = INFO[el].name;
+      Array.prototype.forEach.call(picker.children, function (c) { c.classList.remove('sel'); });
+      b.classList.add('sel');
+    });
+    picker.appendChild(b);
+  });
+
+  document.getElementById('startBtn').addEventListener('click', function () {
+    initAudio();
+    var n = nameInput.value.trim();
+    unicornName = n ? n.slice(0, 14) : INFO[selected].name;
+    lives = computeStartLives();
+    setupRace();
+    hide('startScreen');
+    state = 'countdown';
+    updateHud();
+  });
+
+  document.getElementById('rejoinBtn').addEventListener('click', function () {
+    if (gems >= REJOIN_COST) {
+      gems -= REJOIN_COST; lsSet('unicornRace.gems', gems);
+      lives = REJOIN_LIVES;
+      hide('outScreen');
+      startChallenge(ch.gate);
+    }
+  });
+  document.getElementById('sitBtn').addEventListener('click', function () {
+    player.out = true; ch = null;
+    hide('outScreen');
+    showResults();
+  });
+  document.getElementById('raceAgainBtn').addEventListener('click', function () {
+    hide('resultsScreen'); show('startScreen'); state = 'menu';
+  });
+
+  var muteBtn = document.getElementById('muteBtn');
+  function paintMute() { muteBtn.textContent = muted ? '🔇' : '🔊'; }
+  paintMute();
+  muteBtn.addEventListener('click', function () {
+    muted = !muted; lsSet('unicornRace.muted', muted ? '1' : '0');
+    if (master) master.gain.value = muted ? 0 : 1;
+    initAudio(); paintMute();
+  });
+
   var keyMap = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
   window.addEventListener('keydown', function (e) {
-    if (keyMap[e.key]) { keys[keyMap[e.key]] = true; if (state === 'playing') e.preventDefault(); }
+    if (keyMap[e.key]) { keys[keyMap[e.key]] = true; if (state === 'challenge') e.preventDefault(); }
   });
-  window.addEventListener('keyup', function (e) {
-    if (keyMap[e.key]) { keys[keyMap[e.key]] = false; }
-  });
+  window.addEventListener('keyup', function (e) { if (keyMap[e.key]) keys[keyMap[e.key]] = false; });
   Array.prototype.forEach.call(document.querySelectorAll('#pad button'), function (b) {
     var d = b.getAttribute('data-dir');
     b.addEventListener('pointerdown', function (e) { e.preventDefault(); keys[d] = true; });
@@ -187,255 +780,26 @@
     });
   });
 
-  // ---- screens and buttons ----
-  var startScreen = document.getElementById('startScreen');
-  var winScreen = document.getElementById('winScreen');
-  var outScreen = document.getElementById('outScreen');
-  var nameInput = document.getElementById('nameInput');
-
-  function show(el) { el.classList.remove('hidden'); }
-  function hide(el) { el.classList.add('hidden'); }
-
-  function updateHud() {
-    document.getElementById('nameTag').textContent = '🧊 ' + unicornName;
-    document.getElementById('lives').textContent = '❤️ ' + lives;
-    document.getElementById('gems').textContent = '💎 ' + gems;
-  }
-
-  function resetUnicorn() {
-    uni.x = START.x; uni.y = START.y; uni.vx = 0; uni.vy = 0;
-  }
-
-  function beginChallenge() {
-    buildCracks();
-    resetUnicorn();
-    hide(startScreen); hide(winScreen); hide(outScreen);
-    state = 'playing';
-    updateHud();
-  }
-
-  document.getElementById('startBtn').addEventListener('click', function () {
-    var n = nameInput.value.trim();
-    unicornName = n ? n.slice(0, 14) : 'Glacier';
-    lives = START_LIVES;
-    beginChallenge();
-  });
-
-  document.getElementById('againBtn').addEventListener('click', function () {
-    lives = START_LIVES;
-    beginChallenge();
-  });
-
-  document.getElementById('rejoinBtn').addEventListener('click', function () {
-    if (gems >= REJOIN_COST) {
-      gems -= REJOIN_COST; saveGems();
-      lives = REJOIN_LIVES;
-      beginChallenge();
-    }
-  });
-
-  document.getElementById('sitBtn').addEventListener('click', function () {
-    lives = START_LIVES;
-    beginChallenge();
-  });
-
-  function loseLife() {
-    lives -= 1;
-    flash = 24;
-    invulnerable = 60;
-    resetUnicorn();
-    updateHud();
-    if (lives <= 0) {
-      state = 'out';
-      var canRejoin = gems >= REJOIN_COST;
-      document.getElementById('rejoinBtn').style.display = canRejoin ? '' : 'none';
-      document.getElementById('outText').textContent = canRejoin
-        ? unicornName + ' is out of the race. You have ' + gems + ' gems, so you can spend ' + REJOIN_COST + ' to jump back in.'
-        : unicornName + ' sits out the rest of this race, but you get to play the next one.';
-      show(outScreen);
-    }
-  }
-
-  function winChallenge() {
-    state = 'won';
-    gems += GEMS_PER_CHALLENGE;
-    saveGems();
-    updateHud();
-    document.getElementById('winText').textContent = '+' + GEMS_PER_CHALLENGE + ' gems! You now have ' + gems + ' 💎';
-    show(winScreen);
-  }
-
-  // ---- game loop ----
-  var ACCEL = 0.5, FRICTION = 0.94, MAX = 5;
-
-  function update() {
-    if (state !== 'playing') return;
-
-    var ax = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    var ay = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
-    uni.vx += ax * ACCEL; uni.vy += ay * ACCEL;
-    uni.vx *= FRICTION;   uni.vy *= FRICTION;
-    var sp = Math.sqrt(uni.vx * uni.vx + uni.vy * uni.vy);
-    if (sp > MAX) { uni.vx = uni.vx / sp * MAX; uni.vy = uni.vy / sp * MAX; }
-    uni.x += uni.vx; uni.y += uni.vy;
-
-    // stay inside the lake
-    if (uni.x < uni.r) { uni.x = uni.r; uni.vx = 0; }
-    if (uni.y < LAKE.top + uni.r) { uni.y = LAKE.top + uni.r; uni.vy = 0; }
-    if (uni.y > LAKE.bottom - uni.r) { uni.y = LAKE.bottom - uni.r; uni.vy = 0; }
-
-    // moving cracks
-    cracks.forEach(function (c) {
-      c.y += c.vy;
-      if (c.y - c.r < LAKE.top || c.y + c.r > LAKE.bottom) c.vy = -c.vy;
-    });
-
-    if (invulnerable > 0) invulnerable--;
-    if (flash > 0) flash--;
-
-    // touching a crack
-    if (invulnerable === 0) {
-      for (var i = 0; i < cracks.length; i++) {
-        var c = cracks[i];
-        var dx = uni.x - c.x, dy = uni.y - c.y;
-        // the danger is a little smaller than it looks, so it feels fair
-        if (Math.sqrt(dx * dx + dy * dy) < c.r * 0.8 + uni.r * 0.6) { loseLife(); return; }
-      }
-    }
-
-    // reached the other side
-    if (uni.x >= GOAL_X) winChallenge();
-  }
-
-  function drawCrack(c) {
-    ctx.save();
-    ctx.translate(c.x, c.y);
-    // dark water showing through
-    ctx.fillStyle = '#16356b';
-    ctx.beginPath(); ctx.ellipse(0, 0, c.r, c.r * 0.78, 0, 0, Math.PI * 2); ctx.fill();
-    // jagged crack lines
-    ctx.strokeStyle = '#e8f7ff'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-    for (var a = 0; a < 6; a++) {
-      var ang = a * Math.PI / 3 + c.r;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(Math.cos(ang) * c.r * 0.7, Math.sin(ang) * c.r * 0.6);
-      ctx.lineTo(Math.cos(ang + 0.3) * c.r * 1.25, Math.sin(ang + 0.3) * c.r * 1.05);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  var tick = 0;
-
-  // one ice diamond, used for the braids
-  function iceDiamond(px, py, s) {
-    ctx.beginPath();
-    ctx.moveTo(px, py - s); ctx.lineTo(px + s * 0.7, py);
-    ctx.lineTo(px, py + s); ctx.lineTo(px - s * 0.7, py);
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
-  }
-
-  // The ice unicorn: white-blue body, a purple horn, and long ice braids that swing as she slides
-  function drawIceUnicorn(x, y, vx, vy) {
-    var speed = Math.sqrt(vx * vx + vy * vy);
-    var trot = Math.sin(tick / 4) * Math.min(speed, 4) * 1.6;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.lineJoin = 'round';
-
-    // long ice braids behind the head (drawn first so they sit behind her)
-    ctx.fillStyle = '#c9f0ff'; ctx.strokeStyle = '#4aa6dd'; ctx.lineWidth = 1.5;
-    for (var b = 0; b < 3; b++) {
-      for (var j = 1; j <= 7; j++) {
-        var bx = 8 - j * 6.5 - vx * j * 1.4;
-        var by = -12 + b * 6 + j * 1.2 + Math.sin(tick / 9 + j * 0.7 + b) * 2 - vy * j * 1.4;
-        iceDiamond(bx, by, 4.2 - j * 0.25);
-      }
-    }
-
-    // tail: icy swoosh
-    ctx.strokeStyle = '#8fd3f4'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-17, 2);
-    ctx.quadraticCurveTo(-30 - vx * 2, 6 + Math.sin(tick / 8) * 3 - vy * 2, -34 - vx * 3, 14 - vy * 3);
-    ctx.stroke();
-
-    // legs
-    ctx.strokeStyle = '#dff4ff'; ctx.lineWidth = 5;
-    [[-10, 1], [-5, -1], [8, -1], [13, 1]].forEach(function (l) {
-      ctx.beginPath(); ctx.moveTo(l[0], 8);
-      ctx.lineTo(l[0] + trot * l[1], 19); ctx.stroke();
-    });
-
-    // body
-    ctx.fillStyle = '#f2fbff'; ctx.strokeStyle = '#8fd3f4'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.ellipse(0, 3, 18, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-
-    // neck and head
-    ctx.beginPath(); ctx.ellipse(13, -5, 7, 10, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(21, -11, 9, 6.5, 0.25, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-
-    // ear, eye, cheek
-    ctx.beginPath(); ctx.moveTo(14, -16); ctx.lineTo(16, -23); ctx.lineTo(19, -16); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#1b2a4a'; ctx.beginPath(); ctx.arc(23, -12, 1.8, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,143,199,.7)'; ctx.beginPath(); ctx.arc(20, -8, 2.4, 0, Math.PI * 2); ctx.fill();
-
-    // horn
-    ctx.fillStyle = '#b79cff'; ctx.strokeStyle = '#7f5fe0'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(22, -16); ctx.lineTo(33, -30); ctx.lineTo(26, -14); ctx.closePath(); ctx.fill(); ctx.stroke();
-
-    ctx.restore();
-  }
-
-  function draw() {
+  // ================= main loop =================
+  var last = performance.now();
+  function loop(now) {
+    var dt = Math.min(0.05, (now - last) / 1000); last = now;
     tick++;
-    // lake
-    var g = ctx.createLinearGradient(0, 0, W, 0);
-    g.addColorStop(0, '#c9ecff'); g.addColorStop(1, '#8fd3f4');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    update(dt);
 
-    // snowy banks (top and bottom)
-    ctx.fillStyle = '#f7fdff';
-    ctx.fillRect(0, 0, W, LAKE.top);
-    ctx.fillRect(0, LAKE.bottom, W, H - LAKE.bottom);
-
-    // shiny ice streaks
-    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
-    for (var i = 0; i < 9; i++) {
-      var sx = 60 + i * 85, sy = 90 + (i * 53) % 330;
-      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + 30, sy - 8); ctx.stroke();
+    if (state === 'menu') {
+      var I = INFO[selected];
+      var g = pctx.createLinearGradient(0, 0, 240, 0);
+      g.addColorStop(0, I.bg[0]); g.addColorStop(1, I.bg[1]);
+      pctx.fillStyle = g; pctx.fillRect(0, 0, 240, 140);
+      drawUnicorn(pctx, selected, 120, 80, 2.5, 0, 2);
     }
-
-    // goal (far shore)
-    ctx.fillStyle = 'rgba(183,156,255,.45)';
-    ctx.fillRect(GOAL_X, LAKE.top, W - GOAL_X, LAKE.bottom - LAKE.top);
-    ctx.font = '44px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('🏁', GOAL_X + 45, H / 2);
-
-    // start shore
-    ctx.fillStyle = 'rgba(255,255,255,.55)';
-    ctx.fillRect(0, LAKE.top, 30, LAKE.bottom - LAKE.top);
-
-    cracks.forEach(drawCrack);
-
-    // unicorn (blinks while safe after a hit)
-    var blink = invulnerable > 0 && Math.floor(invulnerable / 6) % 2 === 0;
-    if (!blink) {
-      drawIceUnicorn(uni.x, uni.y, uni.vx, uni.vy);
-    }
-
-    // red flash when hit
-    if (flash > 0) {
-      ctx.fillStyle = 'rgba(255,90,110,' + (flash / 24 * 0.5) + ')';
-      ctx.fillRect(0, 0, W, H);
-    }
+    drawRace();
+    if (state === 'challenge' || state === 'out') { if (ch) drawChallenge(); }
+    updateHud();
+    requestAnimationFrame(loop);
   }
-
-  function loop() { update(); draw(); requestAnimationFrame(loop); }
-  updateHud();
-  loop();
+  requestAnimationFrame(loop);
 })();
 </script>
 </body>
